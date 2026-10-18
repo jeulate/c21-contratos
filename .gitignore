@@ -1,0 +1,20 @@
+# Dependencias y artefactos de Next.js
+node_modules/
+.next/
+out/
+coverage/
+
+# Variables y secretos locales
+.env
+.env.*
+!.env.example
+
+# Despliegue (se incorporará en una etapa futura)
+.vercel/
+
+# Herramientas y sistema operativo
+*.tsbuildinfo
+next-env.d.ts
+.DS_Store
+Thumbs.db
+.vscode/*.local.json

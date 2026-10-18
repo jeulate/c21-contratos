@@ -1,0 +1,9 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    { "label": "C21: iniciar Redis local", "type": "npm", "script": "db:up", "problemMatcher": [] },
+    { "label": "C21: iniciar aplicación", "type": "npm", "script": "dev", "isBackground": true, "problemMatcher": [] },
+    { "label": "C21: validar lint", "type": "npm", "script": "lint", "problemMatcher": [] },
+    { "label": "C21: validar TypeScript", "type": "npm", "script": "typecheck", "problemMatcher": [] }
+  ]
+}
