@@ -1,5 +1,6 @@
 import { redis } from "./redis";
 import { CONTRACT_TYPES } from "./contract-types";
+import type { AdvisorProfile } from "./users";
 
 export type Contract = {
   id: string;
@@ -7,6 +8,7 @@ export type Contract = {
   estado: string;
   asesor: string; // username
   asesorNombre: string;
+  asesorProfileSnapshot?: AdvisorProfile;
   cliente: string;
   clienteDoc: string;
   propiedad: string;
@@ -36,10 +38,14 @@ export async function listContracts(opts?: { asesor?: string }): Promise<Contrac
 
 export type ContractInput = Omit<
   Contract,
-  "id" | "asesor" | "asesorNombre" | "createdAt" | "updatedAt" | "updatedBy" | "history"
+  "id" | "asesor" | "asesorNombre" | "asesorProfileSnapshot" | "createdAt" | "updatedAt" | "updatedBy" | "history"
 >;
 
-export async function createContract(input: ContractInput, by: { username: string; name: string }) {
+export async function createContract(
+  input: ContractInput,
+  by: { username: string; name: string },
+  advisorProfile?: AdvisorProfile,
+) {
   const id = crypto.randomUUID().slice(0, 8);
   const now = new Date().toISOString();
   const c: Contract = {
@@ -47,6 +53,7 @@ export async function createContract(input: ContractInput, by: { username: strin
     id,
     asesor: by.username,
     asesorNombre: by.name,
+    ...(advisorProfile ? { asesorProfileSnapshot: { ...advisorProfile } } : {}),
     createdAt: now,
     updatedAt: now,
     updatedBy: by.username,

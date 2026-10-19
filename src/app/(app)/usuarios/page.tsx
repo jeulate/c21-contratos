@@ -3,7 +3,7 @@ import { listUsers } from "@/lib/users";
 import { resetPassword, toggleUser } from "../../actions";
 import { UserCreateForm } from "@/components/user-create-form";
 
-const roleLabel = { admin: "Administrador", administrativo: "Administrativo", asesor: "Asesor" } as const;
+const roleLabel = { admin: "Administrador", administrativo: "Administrativo", legal: "Legal", asesor: "Asesor" } as const;
 
 export default async function UsuariosPage() {
   const me = await requireSession(["admin"]);

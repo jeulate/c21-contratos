@@ -14,4 +14,4 @@ export async function requireSession(roles?: Role[]): Promise<Session> {
   return s;
 }
 
-export const isStaff = (s: Session) => s.role === "admin" || s.role === "administrativo";
+export const isStaff = (s: Session) => s.role === "admin" || s.role === "administrativo" || s.role === "legal";

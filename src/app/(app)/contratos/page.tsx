@@ -25,10 +25,10 @@ export default async function ContratosPage({ searchParams }: { searchParams: Pr
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className="h-4 w-4"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v12m0 0 4-4m-4 4-4-4M5 17v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2" /></svg>
             Exportar CSV
           </a>}
-          <Link href="/contratos/nuevo" className="btn gap-2">
+          {s.role !== "legal" && <Link href="/contratos/nuevo" className="btn gap-2">
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4"><path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m-7-7h14" /></svg>
             Nuevo contrato
-          </Link>
+          </Link>}
         </div>
       </div>
 

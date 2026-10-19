@@ -16,7 +16,20 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
         <StateBadge id={c.estado} />
         <span className="ml-auto text-sm text-ink-mute dark:text-carbon-400">Asesor: {c.asesorNombre}</span>
       </div>
-      <ContractForm contract={c} />
+      {s.role === "legal" ? (
+        <section className="panel space-y-3 p-5 sm:p-6">
+          <h2 className="text-sm font-semibold text-ink dark:text-white">Vista de revisión</h2>
+          <p className="text-sm text-ink-mute dark:text-carbon-400">
+            Este registro aún no tiene una plantilla contractual versionada. La revisión del documento estará disponible cuando se activen las plantillas aprobadas.
+          </p>
+          <dl className="grid gap-3 text-sm sm:grid-cols-2">
+            <div><dt className="text-ink-mute dark:text-carbon-400">Cliente</dt><dd className="font-medium">{c.cliente}</dd></div>
+            <div><dt className="text-ink-mute dark:text-carbon-400">Documento</dt><dd className="font-medium">{c.clienteDoc || "—"}</dd></div>
+            <div><dt className="text-ink-mute dark:text-carbon-400">Propiedad</dt><dd className="font-medium">{c.propiedad}</dd></div>
+            <div><dt className="text-ink-mute dark:text-carbon-400">Monto</dt><dd className="font-medium">{c.moneda} {c.monto.toLocaleString("es-BO")}</dd></div>
+          </dl>
+        </section>
+      ) : <ContractForm contract={c} />}
       <section className="panel p-5 sm:p-6">
         <h2 className="mb-4 text-sm font-semibold text-ink dark:text-white">Historial de cambios</h2>
         <ul className="space-y-3 text-sm text-ink-soft dark:text-carbon-300">

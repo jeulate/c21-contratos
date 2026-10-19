@@ -22,12 +22,13 @@ function Icon({ name, className = "h-5 w-5" }: { name: AppLink["icon"] | "menu" 
   return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className={className}>{paths[name]}</svg>;
 }
 
-const roleName: Record<Role, string> = { admin: "Administrador", administrativo: "Administrativo", asesor: "Asesor" };
+const roleName: Record<Role, string> = { admin: "Administrador", administrativo: "Administrativo", legal: "Legal", asesor: "Asesor" };
 const pageName: Record<string, string> = {
   "/dashboard": "Dashboard",
   "/contratos": "Contratos",
   "/contratos/nuevo": "Nuevo contrato",
   "/usuarios": "Usuarios",
+  "/perfil": "Mi perfil",
 };
 
 export function AppShell({

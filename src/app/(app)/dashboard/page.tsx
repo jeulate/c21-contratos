@@ -37,7 +37,7 @@ function MetricIcon() {
 }
 
 export default async function Dashboard() {
-  await requireSession(["admin", "administrativo"]);
+  await requireSession(["admin", "administrativo", "legal"]);
   const stats = buildStats(await listContracts());
   const metrics = [
     { label: "Contratos registrados", value: stats.total },

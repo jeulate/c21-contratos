@@ -7,7 +7,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const links = [
     ...(isStaff(session) ? [{ href: "/dashboard", label: "Dashboard", icon: "dashboard" as const }] : []),
     { href: "/contratos", label: "Contratos", icon: "contracts" as const },
-    { href: "/contratos/nuevo", label: "Nuevo contrato", icon: "new" as const },
+    ...(session.role !== "legal" ? [{ href: "/contratos/nuevo", label: "Nuevo contrato", icon: "new" as const }] : []),
+    ...(session.role === "asesor" ? [{ href: "/perfil", label: "Mi perfil", icon: "users" as const }] : []),
     ...(session.role === "admin" ? [{ href: "/usuarios", label: "Usuarios", icon: "users" as const }] : []),
   ];
 
