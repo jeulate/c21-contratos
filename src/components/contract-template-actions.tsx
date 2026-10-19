@@ -27,6 +27,7 @@ export function TemplateUploadForm() {
         <p className="font-semibold">Marcadores disponibles</p>
         <p className="mt-1">Usa doble llave en Word. Ejemplos: <code>{"{{owner1.fullName}}"}</code>, <code>{"{{property.address}}"}</code>, <code>{"{{contract.amount}}"}</code>, <code>{"{{advisor.fullName}}"}</code>.</p>
         <p className="mt-1">También se admiten <code>{"{{owner2.identityNumber}}"}</code>, <code>{"{{contract.amountInWords}}"}</code>, <code>{"{{property.hectares}}"}</code> y campos de formulario como <code>{"{{extras.propertyZone}}"}</code>. El sistema muestra la lista detectada en cada versión.</p>
+        <p className="mt-1">Para datos opcionales del segundo propietario, encierra el bloque con <code>{"{{#owner2.fullName}}...{{/owner2.fullName}}"}</code>; así se omite si no se registró un segundo propietario.</p>
       </div>
       {state.error && <p role="alert" className="text-sm text-red-700 sm:col-span-2">{state.error}</p>}
       {state.ok && <p role="status" className="text-sm text-emerald-700 sm:col-span-2">{state.ok}</p>}

@@ -125,6 +125,14 @@ export function validateExtras(tipo: string, extras: Record<string, string>) {
   const t = CONTRACT_TYPES.find((x) => x.id === tipo);
   if (!t) return "Tipo de contrato inválido";
   for (const f of t.extras) if (f.required && !extras[f.key]?.trim()) return `Falta: ${f.label}`;
+  if (["exclusiva-venta", "exclusiva-alquiler", "exclusiva-anticretico"].includes(tipo) && extras.owner2Name?.trim()) {
+    const secondOwnerRequired = [
+      ["owner2IdentityNumber", "Cédula del segundo propietario"],
+      ["owner2IssuedIn", "Lugar de expedición del segundo propietario"],
+      ["owner2Address", "Domicilio del segundo propietario"],
+    ] as const;
+    for (const [key, label] of secondOwnerRequired) if (!extras[key]?.trim()) return `Falta: ${label}`;
+  }
   return null;
 }
 

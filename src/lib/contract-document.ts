@@ -6,6 +6,16 @@ import type { ContractTemplateVersion } from "./contract-templates";
 
 const value = (record: Record<string, string>, key: string) => record[key] ?? "";
 
+/** Docxtemplater's default parser treats dotted tags as literal property names. */
+const nestedTagParser = (tag: string) => ({
+  get(scope: Record<string, unknown> | string | number | boolean | null | undefined) {
+    return tag.split(".").reduce<unknown>((current, key) => {
+      if (current && typeof current === "object") return (current as Record<string, unknown>)[key];
+      return undefined;
+    }, scope);
+  },
+});
+
 export function buildContractTemplateData(contract: Contract) {
   const extras = contract.extras ?? {};
   const profile: Partial<AdvisorProfile> = contract.asesorProfileSnapshot ?? {};
@@ -100,6 +110,7 @@ export function renderContractDocx(contract: Contract, template: ContractTemplat
     linebreaks: true,
     nullGetter: () => "",
     delimiters: { start: "{{", end: "}}" },
+    parser: nestedTagParser,
   });
   doc.render(buildContractTemplateData(contract));
   return doc.toBuffer();

@@ -75,7 +75,7 @@ El perfil se carga una vez y se reutiliza en cada contrato. Al guardar un contra
 
 - Implementado: cada tipo contractual mantiene versiones de plantilla con estado (`borrador`, `activa`, `archivada`), fecha de carga/activación y usuario que cargó/aprobó.
 - Legal o Admin carga el archivo Word, lo descarga para revisión y activa la versión aprobada. La aplicación valida el DOCX, detecta sus marcadores y rechaza los que no estén soportados.
-- Los marcadores usan nombres de datos, no dependen de subrayados. Ejemplos válidos: `{{owner1.fullName}}`, `{{property.registry}}`, `{{advisor.fullName}}`, `{{contract.amount}}` y `{{extras.propertyZone}}`. Los campos `extras.*` disponibles dependen del modelo seleccionado.
+- Los marcadores usan nombres de datos, no dependen de subrayados. Ejemplos válidos: `{{owner1.fullName}}`, `{{property.registry}}`, `{{advisor.fullName}}`, `{{contract.amount}}` y `{{extras.propertyZone}}`. Los campos `extras.*` disponibles dependen del modelo seleccionado. Para ocultar el bloque del segundo propietario cuando no se informa, se admite `{{#owner2.fullName}}...{{/owner2.fullName}}`.
 - Al activar una versión, los contratos nuevos de ese modelo guardan su identificador. El documento se genera desde esa versión, por lo que reactivar otra versión no altera contratos existentes. El perfil del asesor se conserva como snapshot.
 - La vista previa Word aparece en el detalle del contrato y permite descargar el `.docx` generado. El asesor no puede editar las cláusulas desde la aplicación; Legal prepara otra versión del archivo y la carga como borrador.
 - La activación conserva usuario, fecha y estado de cada versión. Los cambios de estado de contratos guardan usuario, fecha, transición y motivo en el historial.
