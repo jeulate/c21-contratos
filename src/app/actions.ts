@@ -7,8 +7,13 @@ import { z } from "zod";
 import { requireSession, isStaff } from "@/lib/auth";
 import { COOKIE, signSession, Role } from "@/lib/session";
 import { AdvisorProfile, checkPassword, createUser, getUser, patchUser } from "@/lib/users";
-import { CONTRACT_TYPES, CURRENCIES, STATES } from "@/lib/contract-types";
-import { ContractInput, createContract, getContract, updateContract, validateExtras } from "@/lib/contracts";
+import { CONTRACT_TYPES, CURRENCIES, isTemplateBasedContract, STATES } from "@/lib/contract-types";
+import { changeContractState, ContractInput, createContract, getContract, updateContract, validateExtras } from "@/lib/contracts";
+import { getActiveTemplate } from "@/lib/contract-templates";
+import { activateTemplateVersion, createTemplateVersion } from "@/lib/contract-templates";
+import PizZip from "pizzip";
+import Docxtemplater from "docxtemplater";
+import InspectModule from "docxtemplater/js/inspect-module.js";
 
 export type FormState = { error?: string; ok?: string };
 
@@ -59,6 +64,17 @@ export async function saveContract(id: string | null, _: FormState, fd: FormData
   const extrasError = validateExtras(parsed.data.tipo, extras);
   if (extrasError) return { error: extrasError };
 
+  let templateVersionId: string | undefined;
+  let creator = await getUser(session.username);
+  if (isTemplateBasedContract(parsed.data.tipo)) {
+    if (session.role !== "asesor") return { error: "Los modelos de exclusividad solo pueden registrarse desde una cuenta de asesor." };
+    const profile = creator?.advisorProfile;
+    if (!profile) return { error: "Completa primero tu perfil de asesor para usar esta plantilla." };
+    const activeTemplate = await getActiveTemplate(parsed.data.tipo);
+    if (!activeTemplate) return { error: "Legal todavía no activó una plantilla Word para este tipo de contrato." };
+    templateVersionId = activeTemplate.id;
+  }
+
   const input: ContractInput = { ...parsed.data, extras };
   if (id) {
     const current = await getContract(id);
@@ -67,8 +83,7 @@ export async function saveContract(id: string | null, _: FormState, fd: FormData
     revalidatePath("/contratos");
     return { ok: "Cambios guardados" };
   }
-  const creator = await getUser(session.username);
-  const created = await createContract(input, session, creator?.advisorProfile);
+  const created = await createContract(input, session, creator?.advisorProfile, templateVersionId);
   redirect(`/contratos/${created.id}`);
 }
 
@@ -129,4 +144,81 @@ export async function saveAdvisorProfile(_: FormState, fd: FormData): Promise<Fo
   await patchUser(session.username, { advisorProfile: profile });
   revalidatePath("/perfil");
   return { ok: "Perfil guardado" };
+}
+
+export async function changeContractStateAction(id: string, _: FormState, fd: FormData): Promise<FormState> {
+  const session = await requireSession(["legal", "admin"]);
+  const parsed = z.object({
+    estado: z.enum(STATES.map((state) => state.id) as [string, ...string[]]),
+    comentario: z.string().trim().min(3, "Registra el motivo del cambio"),
+  }).safeParse(Object.fromEntries(fd));
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  try {
+    await changeContractState(id, parsed.data.estado, session.username, parsed.data.comentario);
+  } catch (error) {
+    return { error: (error as Error).message };
+  }
+  revalidatePath("/contratos");
+  revalidatePath(`/contratos/${id}`);
+  return { ok: "Estado actualizado y registrado en el historial" };
+}
+
+export async function uploadContractTemplateAction(_: FormState, fd: FormData): Promise<FormState> {
+  const session = await requireSession(["legal", "admin"]);
+  const type = String(fd.get("tipo") ?? "");
+  const file = fd.get("archivo");
+  if (!(file instanceof File) || file.size === 0) return { error: "Selecciona un archivo Word (.docx)." };
+  if (!file.name.toLowerCase().endsWith(".docx")) return { error: "El archivo debe tener formato .docx." };
+  if (file.size > 5 * 1024 * 1024) return { error: "El archivo no puede superar 5 MB." };
+
+  try {
+    const buffer = Buffer.from(await file.arrayBuffer());
+    if (buffer[0] !== 0x50 || buffer[1] !== 0x4b) return { error: "El archivo no parece ser un documento Word válido." };
+    const inspect = new InspectModule();
+    const document = new Docxtemplater(new PizZip(buffer), {
+      modules: [inspect],
+      paragraphLoop: true,
+      linebreaks: true,
+      delimiters: { start: "{{", end: "}}" },
+    });
+    void document;
+    const tags = [...new Set(inspect.getAllStructuredTags().filter((part) => part.type === "placeholder").map((part) => part.value))];
+    if (!tags.length) return { error: "La plantilla no contiene marcadores. Usa marcadores como {{owner1.fullName}}." };
+    const typeDefinition = CONTRACT_TYPES.find((item) => item.id === type && item.templateBased);
+    if (!typeDefinition) return { error: "Selecciona uno de los cuatro modelos de exclusividad." };
+    const supported = new Set([
+      "owner1.fullName", "owner1.identityNumber", "owner1.identityIssuedIn", "owner1.address", "owner1.email", "owner1.whatsapp",
+      "owner2.fullName", "owner2.identityNumber", "owner2.identityIssuedIn", "owner2.address", "owner2.email", "owner2.whatsapp",
+      "property.reference", "property.name", "property.class", "property.activity", "property.department", "property.province",
+      "property.municipality", "property.hectares", "property.executorialTitle", "property.cadastralPlan", "property.registry",
+      "property.cadastralCertificate", "property.zone", "property.uv", "property.block", "property.lot", "property.type", "property.address",
+      "property.landArea", "property.builtArea", "property.bedroomCount", "property.suiteCount", "property.otherDetails", "property.liens",
+      "advisor.fullName", "advisor.identityNumber", "advisor.identityIssuedIn", "advisor.address", "advisor.mobile", "advisor.whatsapp", "advisor.email",
+      "contract.id", "contract.type", "contract.amount", "contract.amountNumeric", "contract.amountInWords", "contract.amountPerHectare",
+      "contract.currency", "contract.date", "contract.dateRaw", "contract.commission", "contract.status", "client.name", "client.document",
+      "propertyName", "amount", "currency", "date",
+      ...typeDefinition.extras.map((field) => `extras.${field.key}`),
+    ]);
+    const unsupported = tags.filter((tag) => !supported.has(tag));
+    if (unsupported.length) return { error: `Marcadores sin correspondencia para este modelo: ${unsupported.map((tag) => `{{${tag}}}`).join(", ")}` };
+    await createTemplateVersion({ tipo: type, fileName: file.name, contentBase64: buffer.toString("base64"), tags, uploadedBy: session.username });
+    revalidatePath("/plantillas");
+    return { ok: `Plantilla cargada. Se detectaron ${tags.length} marcadores; quedó como borrador para revisión legal.` };
+  } catch (error) {
+    return { error: `No se pudo leer la plantilla Word: ${(error as Error).message}` };
+  }
+}
+
+export async function activateContractTemplateAction(_: FormState, fd: FormData): Promise<FormState> {
+  const session = await requireSession(["legal", "admin"]);
+  const id = String(fd.get("id") ?? "");
+  if (!id) return { error: "No se indicó la versión que se activará." };
+  try {
+    const version = await activateTemplateVersion(id, session.username);
+    revalidatePath("/plantillas");
+    revalidatePath("/contratos/nuevo");
+    return { ok: `Versión ${version.version} activada para ${version.tipo}.` };
+  } catch (error) {
+    return { error: (error as Error).message };
+  }
 }

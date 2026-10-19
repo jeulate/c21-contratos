@@ -9,6 +9,7 @@ export type Contract = {
   asesor: string; // username
   asesorNombre: string;
   asesorProfileSnapshot?: AdvisorProfile;
+  templateVersionId?: string;
   cliente: string;
   clienteDoc: string;
   propiedad: string;
@@ -38,13 +39,14 @@ export async function listContracts(opts?: { asesor?: string }): Promise<Contrac
 
 export type ContractInput = Omit<
   Contract,
-  "id" | "asesor" | "asesorNombre" | "asesorProfileSnapshot" | "createdAt" | "updatedAt" | "updatedBy" | "history"
+  "id" | "asesor" | "asesorNombre" | "asesorProfileSnapshot" | "templateVersionId" | "createdAt" | "updatedAt" | "updatedBy" | "history"
 >;
 
 export async function createContract(
   input: ContractInput,
   by: { username: string; name: string },
   advisorProfile?: AdvisorProfile,
+  templateVersionId?: string,
 ) {
   const id = crypto.randomUUID().slice(0, 8);
   const now = new Date().toISOString();
@@ -54,6 +56,7 @@ export async function createContract(
     asesor: by.username,
     asesorNombre: by.name,
     ...(advisorProfile ? { asesorProfileSnapshot: { ...advisorProfile } } : {}),
+    ...(templateVersionId ? { templateVersionId } : {}),
     createdAt: now,
     updatedAt: now,
     updatedBy: by.username,
@@ -83,6 +86,36 @@ export async function updateContract(id: string, input: ContractInput, by: strin
     updatedAt: now,
     updatedBy: by,
     history: [...prev.history, { at: now, by, changes: changes.map((c) => `Editó ${c}`) }].slice(-50),
+  };
+  await redis.set(ck(id), next);
+  return next;
+}
+
+const STATUS_TRANSITIONS: Record<string, string[]> = {
+  borrador: ["revision", "anulado"],
+  revision: ["borrador", "firmado", "anulado"],
+  firmado: [],
+  anulado: [],
+};
+
+export const allowedContractTransitions = (estado: string) => STATUS_TRANSITIONS[estado] ?? [];
+
+export async function changeContractState(id: string, nextState: string, by: string, comment: string) {
+  const current = await getContract(id);
+  if (!current) throw new Error("Contrato no encontrado");
+  if (!allowedContractTransitions(current.estado).includes(nextState)) {
+    throw new Error("La transición solicitada no está permitida para el estado actual.");
+  }
+  const now = new Date().toISOString();
+  const next: Contract = {
+    ...current,
+    estado: nextState,
+    updatedAt: now,
+    updatedBy: by,
+    history: [
+      ...current.history,
+      { at: now, by, changes: [`Cambió estado de ${current.estado} a ${nextState}`, `Motivo: ${comment}`] },
+    ].slice(-50),
   };
   await redis.set(ck(id), next);
   return next;

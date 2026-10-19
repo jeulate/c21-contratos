@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
 import { requireSession, isStaff } from "@/lib/auth";
-import { getContract } from "@/lib/contracts";
+import { allowedContractTransitions, getContract } from "@/lib/contracts";
 import { ContractForm } from "@/components/contract-form";
 import { StateBadge } from "@/components/badge";
+import { ContractStatePanel } from "@/components/contract-state-panel";
+import { ContractDocumentPreview } from "@/components/contract-document-preview";
 
 export default async function ContratoPage({ params }: { params: Promise<{ id: string }> }) {
   const s = await requireSession();
@@ -29,7 +31,13 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
             <div><dt className="text-ink-mute dark:text-carbon-400">Monto</dt><dd className="font-medium">{c.moneda} {c.monto.toLocaleString("es-BO")}</dd></div>
           </dl>
         </section>
-      ) : <ContractForm contract={c} />}
+      ) : <ContractForm contract={c} canManageState={false} />}
+      {(s.role === "legal" || s.role === "admin") && <ContractStatePanel id={c.id} currentState={c.estado} allowedStates={allowedContractTransitions(c.estado)} />}
+      {c.templateVersionId && <ContractDocumentPreview contractId={c.id} />}
+      {!c.templateVersionId && <section className="panel p-5">
+        <h2 className="text-sm font-semibold text-ink dark:text-white">Vista previa Word</h2>
+        <p className="mt-1 text-sm text-ink-mute dark:text-carbon-400">Este contrato fue creado antes de asignar una plantilla Word versionada. Los contratos nuevos de los modelos de exclusividad guardarán su versión de plantilla.</p>
+      </section>}
       <section className="panel p-5 sm:p-6">
         <h2 className="mb-4 text-sm font-semibold text-ink dark:text-white">Historial de cambios</h2>
         <ul className="space-y-3 text-sm text-ink-soft dark:text-carbon-300">

@@ -25,6 +25,10 @@ export const redis = {
     await ensureConnected();
     await client.set(key, JSON.stringify(value));
   },
+  async del(key: string): Promise<void> {
+    await ensureConnected();
+    await client.del(key);
+  },
   async mget<T>(...keys: string[]): Promise<T> {
     if (!keys.length) return [] as T;
     await ensureConnected();
