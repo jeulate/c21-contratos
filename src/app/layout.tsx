@@ -8,7 +8,14 @@ export const metadata: Metadata = { title: "Contratos · Century 21", descriptio
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es" className={sans.variable}>
+    <html lang="es" className={sans.variable} suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{const t=localStorage.getItem("c21-theme");const d=t?t==="dark":window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.classList.toggle("dark",d)}catch{}`,
+          }}
+        />
+      </head>
       <body className="font-sans">{children}</body>
     </html>
   );

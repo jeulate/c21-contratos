@@ -4,6 +4,8 @@ Aplicación web para registrar, administrar y consultar contratos inmobiliarios 
 
 **Tecnologías:** Next.js 15.5.28 (App Router y Server Actions), TypeScript, Tailwind CSS y Redis local.
 
+La interfaz cuenta con navegación responsive, tema oscuro persistente y vistas para contratos, usuarios y dashboard con acceso por rol.
+
 ## Requisitos locales
 
 - Node.js 24 LTS y npm.
@@ -72,17 +74,23 @@ npm run build
 
 No hay workflows de GitHub Actions ni despliegues de Vercel configurados en esta etapa. La integración remota se preparará cuando el piloto local esté validado.
 
-## Versionado y repositorio público (fase posterior)
+## Git y ramas
 
-Cuando el piloto local esté listo, inicializa el historial desde la raíz del proyecto:
+Repositorio: [github.com/jeulate/c21-contratos](https://github.com/jeulate/c21-contratos).
+
+- `main`: versiones validadas del piloto.
+- `develop`: integración del trabajo diario.
+- `feature/<nombre>` y `fix/<nombre>`: cambios basados en `develop`, integrados mediante pull request.
+
+Para iniciar una tarea desde VS Code / PowerShell:
 
 ```powershell
-git init -b main
-git add -A
-git commit -m "chore: preparar entorno local"
+git switch develop
+git pull --ff-only origin develop
+git switch -c feature/nombre-descriptivo
 ```
 
-Después se creará el repositorio público `c21-contratos` en GitHub y se configurará como `origin`. La creación del remoto y cualquier automatización quedan pendientes para esa fase. Antes de publicar, confirma que solo haya datos ficticios y que `.env.local` no esté incluido en el commit.
+Ejecuta `npm run lint`, `npm run typecheck` y `npm run build` localmente antes de integrar cambios. No hay workflows de GitHub Actions ni despliegue a Vercel en esta etapa. La etiqueta `v0.1.0` se creará cuando el primer piloto esté validado.
 
 ## Roles
 
