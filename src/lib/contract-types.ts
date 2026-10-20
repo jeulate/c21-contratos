@@ -127,6 +127,7 @@ export const CONTRACT_TYPES: ContractType[] = [
 export const STATES = [
   { id: "borrador", label: "Borrador" },
   { id: "revision", label: "En revisión" },
+  { id: "observado", label: "Observado" },
   { id: "firmado", label: "Firmado" },
   { id: "anulado", label: "Anulado" },
 ] as const;

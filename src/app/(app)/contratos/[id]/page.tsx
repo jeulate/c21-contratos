@@ -13,6 +13,16 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
   if (!c || (!isStaff(s) && c.asesor !== s.username)) notFound();
   return (
     <div className="mx-auto max-w-4xl space-y-5">
+      {s.role === "asesor" && c.estado === "observado" && <section role="alert" aria-live="assertive" className="rounded-2xl border-2 border-amber-500 bg-amber-50 px-5 py-4 shadow-sm dark:border-gold-500 dark:bg-carbon-900">
+        <div className="flex items-start gap-3">
+          <span aria-hidden="true" className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-200 text-lg font-bold text-amber-900 dark:bg-gold-500/20 dark:text-gold-200">!</span>
+          <div>
+            <h2 className="text-sm font-bold text-amber-950 dark:text-gold-100">Contrato observado · requiere tu atención</h2>
+            <p className="mt-1 text-sm font-medium text-amber-900 dark:text-carbon-100">{c.observacion || "El área legal solicitó revisar la información de este contrato."}</p>
+            <p className="mt-2 text-xs text-amber-800 dark:text-carbon-300">Corrige los datos señalados y guarda los cambios. El equipo legal podrá volver a revisar el contrato.</p>
+          </div>
+        </div>
+      </section>}
       <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-stone-200 bg-white px-5 py-4 dark:border-carbon-800 dark:bg-carbon-900">
         <div className="min-w-0"><p className="text-xs font-medium uppercase tracking-wide text-ink-mute dark:text-carbon-400">Detalle del contrato</p><h2 className="mt-1 truncate text-base font-semibold text-ink dark:text-white">{c.id}</h2></div>
         <StateBadge id={c.estado} />

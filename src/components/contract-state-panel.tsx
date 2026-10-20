@@ -1,6 +1,7 @@
 "use client";
 
 import { useFormState } from "react-dom";
+import { useState } from "react";
 import { changeContractStateAction, FormState } from "@/app/actions";
 import { SubmitButton } from "./submit-button";
 import { STATES } from "@/lib/contract-types";
@@ -8,6 +9,7 @@ import { STATES } from "@/lib/contract-types";
 export function ContractStatePanel({ id, currentState, allowedStates }: { id: string; currentState: string; allowedStates: string[] }) {
   const [state, action] = useFormState<FormState, FormData>(changeContractStateAction.bind(null, id), {});
   const options = STATES.filter((item) => allowedStates.includes(item.id));
+  const [nextState, setNextState] = useState<string>(options[0]?.id ?? "");
   if (!options.length) return <section className="panel p-5"><h2 className="text-sm font-semibold">Estado final</h2><p className="mt-1 text-sm text-ink-mute dark:text-carbon-400">El estado {currentState} no tiene transiciones disponibles.</p></section>;
 
   return (
@@ -19,13 +21,13 @@ export function ContractStatePanel({ id, currentState, allowedStates }: { id: st
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label className="label" htmlFor="estado">Cambiar estado a</label>
-          <select id="estado" name="estado" className="input" defaultValue={options[0].id}>
+          <select id="estado" name="estado" className="input" value={nextState} onChange={(event) => setNextState(event.target.value)}>
             {options.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
           </select>
         </div>
         <div>
-          <label className="label" htmlFor="comentario">Observación o motivo</label>
-          <input id="comentario" name="comentario" className="input" minLength={3} required placeholder="Ej.: documentación validada" />
+          <label className="label" htmlFor="comentario">{nextState === "observado" ? "Observación para el asesor" : "Motivo del cambio"}</label>
+          <input id="comentario" name="comentario" className="input" minLength={3} required placeholder={nextState === "observado" ? "Ej.: adjuntar el documento de identidad del propietario" : "Ej.: documentación revisada"} />
         </div>
       </div>
       {state.error && <p role="alert" className="text-sm text-red-700">{state.error}</p>}

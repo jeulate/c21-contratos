@@ -6,6 +6,7 @@ export type Contract = {
   id: string;
   tipo: string;
   estado: string;
+  observacion?: string;
   asesor: string; // username
   asesorNombre: string;
   asesorProfileSnapshot?: AdvisorProfile;
@@ -93,7 +94,8 @@ export async function updateContract(id: string, input: ContractInput, by: strin
 
 const STATUS_TRANSITIONS: Record<string, string[]> = {
   borrador: ["revision", "anulado"],
-  revision: ["borrador", "firmado", "anulado"],
+  revision: ["observado", "firmado", "anulado"],
+  observado: ["revision", "anulado"],
   firmado: [],
   anulado: [],
 };
@@ -110,6 +112,7 @@ export async function changeContractState(id: string, nextState: string, by: str
   const next: Contract = {
     ...current,
     estado: nextState,
+    observacion: nextState === "observado" ? comment : undefined,
     updatedAt: now,
     updatedBy: by,
     history: [
