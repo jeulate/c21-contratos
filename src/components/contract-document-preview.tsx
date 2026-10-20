@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { renderAsync } from "docx-preview";
 
-export function ContractDocumentPreview({ contractId }: { contractId: string }) {
+export function ContractDocumentPreview({ contractId, canDownload = true }: { contractId: string; canDownload?: boolean }) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const styleRef = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState("Cargando vista previa Word...");
@@ -40,7 +40,9 @@ export function ContractDocumentPreview({ contractId }: { contractId: string }) 
           <h2 className="text-sm font-semibold text-ink dark:text-white">Vista previa del contrato Word</h2>
           <p className="mt-1 text-xs text-ink-mute dark:text-carbon-400">Se genera con la versión de plantilla asignada a este contrato.</p>
         </div>
-        <a href={`/api/contratos/${contractId}/document?download=1`} className="btn-ghost">Descargar Word</a>
+        {canDownload
+          ? <a href={`/api/contratos/${contractId}/document?download=1`} className="btn-ghost">Descargar Word</a>
+          : <p className="text-right text-xs font-medium text-ink-mute dark:text-carbon-400">La descarga estará disponible cuando Legal marque el contrato como firmado.</p>}
       </div>
       {status && <p className="p-5 text-sm text-ink-mute dark:text-carbon-400">{status}</p>}
       {error && <p role="alert" className="p-5 text-sm text-red-700">{error}</p>}

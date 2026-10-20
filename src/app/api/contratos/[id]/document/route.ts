@@ -12,13 +12,17 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const contract = await getContract(id);
   if (!contract || (!isStaff(session) && contract.asesor !== session.username)) return new NextResponse("Contrato no encontrado", { status: 404 });
+  const download = new URL(request.url).searchParams.has("download");
+  if (download && session.role === "asesor" && contract.estado !== "firmado") {
+    return new NextResponse("La descarga estará disponible cuando el contrato se encuentre firmado.", { status: 403 });
+  }
   if (!contract.templateVersionId) return new NextResponse("Este contrato no tiene una plantilla Word asignada.", { status: 409 });
   const template = await getTemplateVersion(contract.templateVersionId);
   if (!template) return new NextResponse("No se encontró la versión Word usada por este contrato.", { status: 410 });
 
   try {
     const file = renderContractDocx(contract, template);
-    const disposition = new URL(request.url).searchParams.has("download") ? "attachment" : "inline";
+    const disposition = download ? "attachment" : "inline";
     const fileName = `contrato-${contract.id}-v${template.version}.docx`;
     return new NextResponse(new Uint8Array(file), {
       headers: {

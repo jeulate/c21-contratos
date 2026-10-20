@@ -7,6 +7,7 @@ export type Contract = {
   tipo: string;
   estado: string;
   observacion?: string;
+  observations?: ContractObservation[];
   asesor: string; // username
   asesorNombre: string;
   asesorProfileSnapshot?: AdvisorProfile;
@@ -24,6 +25,15 @@ export type Contract = {
   updatedAt: string;
   updatedBy: string;
   history: { at: string; by: string; changes: string[] }[];
+};
+
+export type ContractObservation = {
+  id: string;
+  message: string;
+  by: string;
+  at: string;
+  resolvedAt?: string;
+  resolvedBy?: string;
 };
 
 const ck = (id: string) => `contract:${id}`;
@@ -61,7 +71,7 @@ export async function createContract(
     createdAt: now,
     updatedAt: now,
     updatedBy: by.username,
-    history: [{ at: now, by: by.username, changes: ["Contrato creado"] }],
+    history: [{ at: now, by: by.username, changes: ["Contrato creado y enviado a revisión legal"] }],
   };
   const score = Date.now();
   await Promise.all([
@@ -109,10 +119,25 @@ export async function changeContractState(id: string, nextState: string, by: str
     throw new Error("La transición solicitada no está permitida para el estado actual.");
   }
   const now = new Date().toISOString();
+  let observations = current.observations ?? [];
+  if (nextState === "observado") {
+    observations = [...observations, { id: crypto.randomUUID(), message: comment, by, at: now }];
+  } else if (current.estado === "observado" && nextState === "revision") {
+    if (!observations.length && current.observacion) {
+      observations = [{ id: crypto.randomUUID(), message: current.observacion, by: current.updatedBy, at: current.updatedAt }];
+    }
+    const lastOpenIndex = observations.findLastIndex((observation) => !observation.resolvedAt);
+    if (lastOpenIndex >= 0) {
+      observations = observations.map((observation, index) => index === lastOpenIndex
+        ? { ...observation, resolvedAt: now, resolvedBy: by }
+        : observation);
+    }
+  }
   const next: Contract = {
     ...current,
     estado: nextState,
     observacion: nextState === "observado" ? comment : undefined,
+    observations,
     updatedAt: now,
     updatedBy: by,
     history: [

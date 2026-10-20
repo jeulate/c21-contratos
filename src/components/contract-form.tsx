@@ -46,7 +46,7 @@ export function ContractForm({ contract, advisorProfile, currencyByType, canMana
             <select id="estado" name="estado" defaultValue={contract?.estado ?? "borrador"} className="input">
               {STATES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
             </select>
-          </div> : <input type="hidden" name="estado" value={contract?.estado ?? "borrador"} />}
+          </div> : <input type="hidden" name="estado" value={contract?.estado ?? "revision"} />}
         </div>
       </section>
 

@@ -80,7 +80,12 @@ export async function saveContract(id: string | null, _: FormState, fd: FormData
   if (id) {
     const current = await getContract(id);
     if (!current || (!isStaff(session) && current.asesor !== session.username)) return { error: "Sin permiso" };
-    await updateContract(id, { ...input, moneda: current.moneda }, session.username);
+    if (current.estado === "anulado") return { error: "Este contrato fue anulado y ya no se puede editar." };
+    await updateContract(id, {
+      ...input,
+      moneda: current.moneda,
+      ...(session.role === "asesor" ? { estado: current.estado } : {}),
+    }, session.username);
     if (session.role === "asesor" && current.estado === "observado") {
       await changeContractState(id, "revision", session.username, "El asesor guardó los cambios y reenvió el contrato para revisión legal.");
     }
@@ -89,7 +94,7 @@ export async function saveContract(id: string | null, _: FormState, fd: FormData
     return { ok: current.estado === "observado" && session.role === "asesor" ? "Cambios guardados y contrato reenviado a revisión legal" : "Cambios guardados" };
   }
   const configuredCurrency = await getContractCurrency(parsed.data.tipo);
-  const created = await createContract({ ...input, moneda: configuredCurrency }, session, creator?.advisorProfile, templateVersionId);
+  const created = await createContract({ ...input, estado: "revision", moneda: configuredCurrency }, session, creator?.advisorProfile, templateVersionId);
   redirect(`/contratos/${created.id}`);
 }
 

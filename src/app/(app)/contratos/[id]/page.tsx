@@ -11,17 +11,28 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
   const { id } = await params;
   const c = await getContract(id);
   if (!c || (!isStaff(s) && c.asesor !== s.username)) notFound();
+  const observations = c.observations?.length ? c.observations : c.observacion ? [{
+    id: `legacy-${c.id}`,
+    message: c.observacion,
+    by: c.updatedBy,
+    at: c.updatedAt,
+  }] : [];
   return (
     <div className="mx-auto max-w-4xl space-y-5">
-      {s.role === "asesor" && c.estado === "observado" && <section role="alert" aria-live="assertive" className="rounded-2xl border-2 border-amber-500 bg-amber-50 px-5 py-4 shadow-sm dark:border-gold-500 dark:bg-carbon-900">
-        <div className="flex items-start gap-3">
-          <span aria-hidden="true" className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-200 text-lg font-bold text-amber-900 dark:bg-gold-500/20 dark:text-gold-200">!</span>
-          <div>
-            <h2 className="text-sm font-bold text-amber-950 dark:text-gold-100">Contrato observado · requiere tu atención</h2>
-            <p className="mt-1 text-sm font-medium text-amber-900 dark:text-carbon-100">{c.observacion || "El área legal solicitó revisar la información de este contrato."}</p>
-            <p className="mt-2 text-xs text-amber-800 dark:text-carbon-300">Corrige los datos señalados y guarda los cambios. El equipo legal podrá volver a revisar el contrato.</p>
+      {s.role === "asesor" && observations.length > 0 && <section aria-label="Observaciones legales" className="space-y-3">
+        {observations.map((observation) => <article key={observation.id} role="alert" className={`rounded-xl border p-4 shadow-sm ${observation.resolvedAt ? "border-stone-300 bg-stone-50 dark:border-carbon-700 dark:bg-carbon-900" : "border-amber-500 bg-amber-50 dark:border-gold-500/50 dark:bg-gold-500/10"}`}>
+          <div className="flex items-start gap-3">
+            <span aria-hidden="true" className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-lg font-bold ${observation.resolvedAt ? "bg-stone-200 text-ink-soft dark:bg-carbon-800 dark:text-carbon-200" : "bg-amber-200 text-amber-900 dark:bg-gold-500/20 dark:text-gold-200"}`}>{observation.resolvedAt ? "✓" : "!"}</span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-sm font-bold text-ink dark:text-white">{observation.resolvedAt ? "Observación atendida" : "Observación de Legal · requiere tu atención"}</h2>
+                {observation.resolvedAt && <span className="rounded-full bg-stone-200 px-2 py-0.5 text-xs font-medium text-ink-soft dark:bg-carbon-800 dark:text-carbon-200">Atendida</span>}
+              </div>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-ink-soft dark:text-carbon-200">{observation.message}</p>
+              <p className="mt-2 text-xs text-ink-mute dark:text-carbon-400">{observation.by} · {new Date(observation.at).toLocaleString("es-BO")}</p>
+            </div>
           </div>
-        </div>
+        </article>)}
       </section>}
       <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-stone-200 bg-white px-5 py-4 dark:border-carbon-800 dark:bg-carbon-900">
         <div className="min-w-0"><p className="text-xs font-medium uppercase tracking-wide text-ink-mute dark:text-carbon-400">Detalle del contrato</p><h2 className="mt-1 truncate text-base font-semibold text-ink dark:text-white">{c.id}</h2></div>
@@ -41,9 +52,17 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
             <div><dt className="text-ink-mute dark:text-carbon-400">Monto</dt><dd className="font-medium">{c.moneda} {c.monto.toLocaleString("es-BO")}</dd></div>
           </dl>
         </section>
-      ) : <ContractForm contract={c} canManageState={false} />}
+      ) : c.estado === "anulado" ? <section className="panel space-y-3 p-5 sm:p-6">
+        <div><h2 className="text-sm font-semibold text-ink dark:text-white">Contrato anulado</h2><p className="mt-1 text-sm text-ink-mute dark:text-carbon-400">Este contrato es de solo lectura y no admite más cambios.</p></div>
+        <dl className="grid gap-3 text-sm sm:grid-cols-2">
+          <div><dt className="text-ink-mute dark:text-carbon-400">Cliente / propietario</dt><dd className="font-medium">{c.cliente}</dd></div>
+          <div><dt className="text-ink-mute dark:text-carbon-400">Documento</dt><dd className="font-medium">{c.clienteDoc || "—"}</dd></div>
+          <div><dt className="text-ink-mute dark:text-carbon-400">Propiedad</dt><dd className="font-medium">{c.propiedad}</dd></div>
+          <div><dt className="text-ink-mute dark:text-carbon-400">Monto</dt><dd className="font-medium">{c.moneda} {c.monto.toLocaleString("es-BO")}</dd></div>
+        </dl>
+      </section> : <ContractForm contract={c} canManageState={false} />}
       {(s.role === "legal" || s.role === "admin") && <ContractStatePanel id={c.id} currentState={c.estado} allowedStates={allowedContractTransitions(c.estado)} />}
-      {c.templateVersionId && <ContractDocumentPreview contractId={c.id} />}
+      {c.templateVersionId && <ContractDocumentPreview contractId={c.id} canDownload={s.role !== "asesor" || c.estado === "firmado"} />}
       {!c.templateVersionId && <section className="panel p-5">
         <h2 className="text-sm font-semibold text-ink dark:text-white">Vista previa Word</h2>
         <p className="mt-1 text-sm text-ink-mute dark:text-carbon-400">Este contrato fue creado antes de asignar una plantilla Word versionada. Los contratos nuevos de los modelos de exclusividad guardarán su versión de plantilla.</p>
