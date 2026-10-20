@@ -3,16 +3,17 @@ import { useState } from "react";
 import { useFormState } from "react-dom";
 import { saveContract, FormState } from "@/app/actions";
 import { SubmitButton } from "./submit-button";
-import { CONTRACT_TYPES, CURRENCIES, isTemplateBasedContract, STATES } from "@/lib/contract-types";
+import { CONTRACT_TYPES, CURRENCY_NAMES, CURRENCY_SYMBOLS, isTemplateBasedContract, STATES, type Currency } from "@/lib/contract-types";
 import type { Contract } from "@/lib/contracts";
 import type { AdvisorProfile } from "@/lib/users";
 
-export function ContractForm({ contract, advisorProfile, canManageState = true }: { contract?: Contract; advisorProfile?: AdvisorProfile; canManageState?: boolean }) {
+export function ContractForm({ contract, advisorProfile, currencyByType, canManageState = true }: { contract?: Contract; advisorProfile?: AdvisorProfile; currencyByType?: Record<string, Currency>; canManageState?: boolean }) {
   const [tipo, setTipo] = useState(contract?.tipo ?? CONTRACT_TYPES[0].id);
   const [state, action] = useFormState<FormState, FormData>(saveContract.bind(null, contract?.id ?? null), {});
   const contractType = CONTRACT_TYPES.find((t) => t.id === tipo);
   const extras = contractType?.extras ?? [];
   const templateBased = isTemplateBasedContract(tipo);
+  const selectedCurrency = contract?.moneda ?? currencyByType?.[tipo] ?? "BOB";
   const selectedProfile = contract?.asesorProfileSnapshot ?? advisorProfile;
   const today = new Date().toISOString().slice(0, 10);
   const sections = [...new Set(extras.map((field) => field.section ?? "Datos específicos"))];
@@ -48,7 +49,11 @@ export function ContractForm({ contract, advisorProfile, canManageState = true }
         <div>
           <label className="label" htmlFor="monto">{templateBased ? amountLabel : "Monto"}</label>
           <div className="flex gap-2">
-            {templateBased ? <><input type="hidden" name="moneda" value="USD" /><span className="input w-24 shrink-0 bg-stone-50 dark:bg-carbon-900">USD</span></> : <select name="moneda" defaultValue={contract?.moneda ?? "USD"} className="input w-24" aria-label="Moneda">{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</select>}
+            <input type="hidden" name="moneda" value={selectedCurrency} />
+            <div className="input flex w-40 shrink-0 flex-col justify-center bg-stone-50 dark:bg-carbon-900" aria-label={`Divisa ${selectedCurrency}`}>
+              <span className="text-sm font-semibold">{selectedCurrency} · {CURRENCY_SYMBOLS[selectedCurrency as Currency]}</span>
+              <span className="text-[10px] text-ink-mute dark:text-carbon-400">{CURRENCY_NAMES[selectedCurrency as Currency]}</span>
+            </div>
             <input id="monto" name="monto" type="number" step="0.01" min="0" defaultValue={contract?.monto} className="input" required />
           </div>
         </div>
@@ -74,7 +79,10 @@ export function ContractForm({ contract, advisorProfile, canManageState = true }
           <legend className="mb-3 text-sm font-medium">{section}</legend>
           {extras.filter((field) => (field.section ?? "Datos específicos") === section).map((field) => (
             <div key={`${tipo}-${field.key}`} className={field.type === "textarea" ? "sm:col-span-2" : ""}>
-              <label className="label" htmlFor={`x_${field.key}`}>{field.label}{field.required ? "" : " (opcional)"}</label>
+              <label className="label" htmlFor={`x_${field.key}`}>
+                {field.key === "amountInWords" ? `Monto en palabras (${selectedCurrency})` : field.key === "pricePerHectare" ? `Precio por hectárea (${selectedCurrency})` : field.label}
+                {field.required ? "" : " (opcional)"}
+              </label>
               {field.type === "textarea" ? <textarea id={`x_${field.key}`} name={`x_${field.key}`} rows={3} defaultValue={contract?.tipo === tipo ? contract.extras[field.key] : ""} className="input" required={field.required} /> : <input id={`x_${field.key}`} name={`x_${field.key}`} type={field.type === "number" || field.type === "date" ? field.type : "text"} defaultValue={contract?.tipo === tipo ? contract.extras[field.key] : ""} className="input" required={field.required} />}
             </div>
           ))}

@@ -3,6 +3,7 @@ import PizZip from "pizzip";
 import type { Contract } from "./contracts";
 import type { AdvisorProfile } from "./users";
 import type { ContractTemplateVersion } from "./contract-templates";
+import { CURRENCY_NAMES, CURRENCY_SYMBOLS, type Currency } from "./contract-types";
 
 const value = (record: Record<string, string>, key: string) => record[key] ?? "";
 
@@ -19,6 +20,9 @@ const nestedTagParser = (tag: string) => ({
 export function buildContractTemplateData(contract: Contract) {
   const extras = contract.extras ?? {};
   const profile: Partial<AdvisorProfile> = contract.asesorProfileSnapshot ?? {};
+  const currency = contract.moneda as Currency;
+  const currencyName = CURRENCY_NAMES[currency] ?? contract.moneda;
+  const currencySymbol = CURRENCY_SYMBOLS[currency] ?? contract.moneda;
   const amount = new Intl.NumberFormat("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(contract.monto);
   const parsedDate = new Date(`${contract.fecha}T12:00:00`);
   const dateLong = Number.isNaN(parsedDate.getTime()) ? contract.fecha : parsedDate.toLocaleDateString("es-BO", { day: "numeric", month: "long", year: "numeric" });
@@ -81,6 +85,8 @@ export function buildContractTemplateData(contract: Contract) {
     amountInWords: value(extras, "amountInWords"),
     amountPerHectare: value(extras, "pricePerHectare"),
     currency: contract.moneda,
+    currencyName,
+    currencySymbol,
     date: dateLong,
     dateRaw: contract.fecha,
     commission: contract.comision,
@@ -97,6 +103,8 @@ export function buildContractTemplateData(contract: Contract) {
     propertyName: contract.propiedad,
     amount,
     currency: contract.moneda,
+    currencyName,
+    currencySymbol,
     date: dateLong,
     extras,
   };

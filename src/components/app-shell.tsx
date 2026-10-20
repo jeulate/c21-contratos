@@ -29,6 +29,7 @@ const pageName: Record<string, string> = {
   "/contratos/nuevo": "Nuevo contrato",
   "/usuarios": "Usuarios",
   "/perfil": "Mi perfil",
+  "/configuracion-contratos": "Divisas de contratos",
 };
 
 export function AppShell({

@@ -55,7 +55,7 @@ const ruralModelFields: ExtraField[] = [
   { key: "cadastralPlan", label: "Plano catastral", required: true, section: "Documentación de la propiedad" },
   { key: "propertyRegistry", label: "Matrícula", required: true, section: "Documentación de la propiedad" },
   { key: "cadastralCertificate", label: "Certificado catastral", required: true, section: "Documentación de la propiedad" },
-  { key: "pricePerHectare", label: "Precio por hectárea (USD)", type: "number", required: true, section: "Precio referencial" },
+  { key: "pricePerHectare", label: "Precio por hectárea", type: "number", required: true, section: "Precio referencial" },
 ];
 
 export const CONTRACT_TYPES: ContractType[] = [
@@ -131,7 +131,18 @@ export const STATES = [
   { id: "anulado", label: "Anulado" },
 ] as const;
 
-export const CURRENCIES = ["USD", "BOB"] as const;
+export const CURRENCIES = ["BOB", "USD"] as const;
+export type Currency = (typeof CURRENCIES)[number];
+
+export const CURRENCY_NAMES: Record<Currency, string> = {
+  BOB: "Bolivianos",
+  USD: "Dólares Americanos",
+};
+
+export const CURRENCY_SYMBOLS: Record<Currency, string> = {
+  BOB: "Bs.",
+  USD: "$us",
+};
 
 export const TEMPLATE_CONTRACT_TYPES = CONTRACT_TYPES.filter((t) => t.templateBased);
 export const isTemplateBasedContract = (id: string) => TEMPLATE_CONTRACT_TYPES.some((t) => t.id === id);

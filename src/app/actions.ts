@@ -11,6 +11,7 @@ import { CONTRACT_TYPES, CURRENCIES, isTemplateBasedContract, STATES } from "@/l
 import { changeContractState, ContractInput, createContract, getContract, updateContract, validateExtras } from "@/lib/contracts";
 import { getActiveTemplate } from "@/lib/contract-templates";
 import { activateTemplateVersion, createTemplateVersion } from "@/lib/contract-templates";
+import { getContractCurrency, setContractCurrency } from "@/lib/contract-currencies";
 import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
 import InspectModule from "docxtemplater/js/inspect-module.js";
@@ -79,12 +80,31 @@ export async function saveContract(id: string | null, _: FormState, fd: FormData
   if (id) {
     const current = await getContract(id);
     if (!current || (!isStaff(session) && current.asesor !== session.username)) return { error: "Sin permiso" };
-    await updateContract(id, input, session.username);
+    await updateContract(id, { ...input, moneda: current.moneda }, session.username);
     revalidatePath("/contratos");
     return { ok: "Cambios guardados" };
   }
-  const created = await createContract(input, session, creator?.advisorProfile, templateVersionId);
+  const configuredCurrency = await getContractCurrency(parsed.data.tipo);
+  const created = await createContract({ ...input, moneda: configuredCurrency }, session, creator?.advisorProfile, templateVersionId);
   redirect(`/contratos/${created.id}`);
+}
+
+export async function saveContractCurrencyAction(_: FormState, fd: FormData): Promise<FormState> {
+  await requireSession(["admin"]);
+  const parsed = z.object({
+    tipo: z.enum(CONTRACT_TYPES.map((item) => item.id) as [string, ...string[]]),
+    moneda: z.enum(CURRENCIES),
+  }).safeParse(Object.fromEntries(fd));
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  try {
+    await setContractCurrency(parsed.data.tipo, parsed.data.moneda);
+  } catch (error) {
+    return { error: (error as Error).message };
+  }
+  revalidatePath("/configuracion-contratos");
+  revalidatePath("/contratos/nuevo");
+  return { ok: `Divisa ${parsed.data.moneda} guardada para ${CONTRACT_TYPES.find((item) => item.id === parsed.data.tipo)?.label}.` };
 }
 
 /* ---------- Usuarios (solo admin) ---------- */
@@ -195,8 +215,8 @@ export async function uploadContractTemplateAction(_: FormState, fd: FormData): 
       "property.landArea", "property.builtArea", "property.bedroomCount", "property.suiteCount", "property.otherDetails", "property.liens",
       "advisor.fullName", "advisor.identityNumber", "advisor.identityIssuedIn", "advisor.address", "advisor.mobile", "advisor.whatsapp", "advisor.email",
       "contract.id", "contract.type", "contract.amount", "contract.amountNumeric", "contract.amountInWords", "contract.amountPerHectare",
-      "contract.currency", "contract.date", "contract.dateRaw", "contract.commission", "contract.status", "client.name", "client.document",
-      "propertyName", "amount", "currency", "date",
+      "contract.currency", "contract.currencyName", "contract.currencySymbol", "contract.date", "contract.dateRaw", "contract.commission", "contract.status", "client.name", "client.document",
+      "propertyName", "amount", "currency", "currencyName", "currencySymbol", "date",
       ...typeDefinition.extras.map((field) => `extras.${field.key}`),
     ]);
     const unsupported = tags.filter((tag) => !supported.has(tag));
