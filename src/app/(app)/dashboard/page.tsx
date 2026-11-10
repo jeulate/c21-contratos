@@ -37,8 +37,12 @@ function MetricIcon() {
 }
 
 export default async function Dashboard() {
-  await requireSession(["admin", "administrativo", "legal"]);
-  const stats = buildStats(await listContracts());
+  const session = await requireSession(["admin", "administrativo", "legal"]);
+  const contracts = await listContracts();
+  const stats = buildStats(contracts);
+  const pendingLegal = session.role === "legal"
+    ? contracts.filter((contract) => contract.estado === "revision").sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    : [];
   const metrics = [
     { label: "Contratos registrados", value: stats.total },
     { label: "Firmados este mes", value: stats.firmadosMes },
@@ -48,6 +52,32 @@ export default async function Dashboard() {
 
   return (
     <div className="space-y-5 sm:space-y-6">
+      {session.role === "legal" && <section aria-label="Notificaciones para Legal" aria-live="polite" className="panel overflow-hidden border-amber-300 dark:border-gold-500/40">
+        <div className="border-b border-amber-200 bg-amber-50 px-5 py-4 dark:border-carbon-800 dark:bg-gold-500/10 sm:px-6">
+          <h2 className="text-sm font-bold text-amber-950 dark:text-gold-100">Notificaciones · contratos por revisar</h2>
+          <p className="mt-1 text-sm text-amber-900 dark:text-carbon-200">
+            {pendingLegal.length
+              ? `${pendingLegal.length} contrato${pendingLegal.length === 1 ? "" : "s"} esperan revisión o fueron reenviados por el asesor.`
+              : "No hay contratos pendientes de revisión legal."}
+          </p>
+        </div>
+        {pendingLegal.length > 0 && <ul className="divide-y divide-stone-100 dark:divide-carbon-800">
+          {pendingLegal.map((contract) => {
+            const lastEvent = contract.history.at(-1);
+            const wasResubmitted = lastEvent?.by === contract.asesor
+              && lastEvent.changes.some((change) => change.includes("de observado a revision"));
+            return <li key={contract.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-ink dark:text-white">{wasResubmitted ? "Observación corregida y reenviada" : "Contrato enviado a revisión"} · {contract.cliente}</p>
+                <p className="mt-1 text-sm text-ink-soft dark:text-carbon-300">{contract.propiedad}</p>
+                <p className="mt-1 text-xs text-ink-mute dark:text-carbon-400">Código {contract.id} · Asesor: {contract.asesorNombre} · Actualizado {new Date(contract.updatedAt).toLocaleString("es-BO")}</p>
+              </div>
+              <Link href={`/contratos/${contract.id}`} className="btn-ghost shrink-0">Revisar contrato</Link>
+            </li>;
+          })}
+        </ul>}
+      </section>}
+
       <div className="flex justify-end">
         <a href="/api/export" className="btn-ghost gap-2">
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className="h-4 w-4"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v12m0 0 4-4m-4 4-4-4M5 17v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2" /></svg>

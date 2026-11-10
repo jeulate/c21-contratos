@@ -3,6 +3,7 @@ import { requireSession, isStaff } from "@/lib/auth";
 import { listContracts } from "@/lib/contracts";
 import { CONTRACT_TYPES, STATES, typeLabel } from "@/lib/contract-types";
 import { StateBadge } from "@/components/badge";
+import { AdvisorObservationNotifications } from "@/components/advisor-observation-notifications";
 
 export default async function ContratosPage({ searchParams }: { searchParams: Promise<{ q?: string; tipo?: string; estado?: string }> }) {
   const s = await requireSession();
@@ -39,6 +40,8 @@ export default async function ContratosPage({ searchParams }: { searchParams: Pr
           </Link>}
         </div>
       </div>
+
+      <AdvisorObservationNotifications contracts={all} isAdvisor={s.role === "asesor"} />
 
       <form className="panel grid gap-3 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-[minmax(220px,1fr)_minmax(170px,220px)_minmax(160px,200px)_auto] xl:items-end">
         <div>
