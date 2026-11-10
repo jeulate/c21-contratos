@@ -4,6 +4,7 @@ import { stateLabel } from "@/lib/contract-types";
 const tone: Record<string, string> = {
   borrador: "bg-stone-100 text-ink-soft",
   revision: "bg-amber-100 text-amber-800",
+  observado: "bg-red-100 text-red-800",
   firmado: "bg-emerald-100 text-emerald-800",
   anulado: "bg-red-100 text-red-800",
 };

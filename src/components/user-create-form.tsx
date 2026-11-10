@@ -13,6 +13,7 @@ export function UserCreateForm() {
         <label className="label" htmlFor="role">Rol</label>
         <select id="role" name="role" className="input" defaultValue="asesor">
           <option value="asesor">Asesor</option>
+          <option value="legal">Legal</option>
           <option value="administrativo">Administrativo</option>
           <option value="admin">Administrador</option>
         </select>

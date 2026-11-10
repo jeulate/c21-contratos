@@ -1,14 +1,18 @@
 import Link from "next/link";
 import { requireSession, isStaff } from "@/lib/auth";
-import { listContracts } from "@/lib/contracts";
+import { listContracts, listReadSignedContractNotifications } from "@/lib/contracts";
 import { CONTRACT_TYPES, STATES, typeLabel } from "@/lib/contract-types";
 import { StateBadge } from "@/components/badge";
+import { AdvisorObservationNotifications } from "@/components/advisor-observation-notifications";
+import { AdvisorSignedContractNotifications } from "@/components/advisor-signed-contract-notifications";
 
 export default async function ContratosPage({ searchParams }: { searchParams: Promise<{ q?: string; tipo?: string; estado?: string }> }) {
   const s = await requireSession();
   const filters = await searchParams;
   const staff = isStaff(s);
   const all = await listContracts(staff ? undefined : { asesor: s.username });
+  const readSignedNotifications = s.role === "asesor" ? await listReadSignedContractNotifications(s.username) : [];
+  const observedCount = s.role === "asesor" ? all.filter((contract) => contract.estado === "observado").length : 0;
   const q = filters.q?.toLowerCase().trim();
   const rows = all.filter(
     (c) =>
@@ -19,18 +23,28 @@ export default async function ContratosPage({ searchParams }: { searchParams: Pr
 
   return (
     <div className="space-y-5 sm:space-y-6">
+      {observedCount > 0 && <section role="alert" aria-live="assertive" className="flex flex-col gap-3 rounded-2xl border-2 border-amber-500 bg-amber-50 px-5 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between dark:border-gold-500 dark:bg-carbon-900">
+        <div>
+          <h2 className="text-sm font-bold text-amber-950 dark:text-gold-100">Tienes {observedCount} contrato{observedCount === 1 ? "" : "s"} observado{observedCount === 1 ? "" : "s"}</h2>
+          <p className="mt-1 text-sm text-amber-900 dark:text-carbon-200">Legal dejó una observación que requiere tu atención. Abre el contrato para leer el motivo.</p>
+        </div>
+        <Link href="/contratos?estado=observado" className="btn-ghost shrink-0 border-amber-700 text-amber-900 hover:bg-amber-100 dark:border-gold-500 dark:text-gold-100 dark:hover:bg-carbon-800">Ver observaciones</Link>
+      </section>}
       <div className="flex flex-wrap items-center justify-end gap-2">
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           {staff && <a href="/api/export" className="btn-ghost gap-2">
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className="h-4 w-4"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v12m0 0 4-4m-4 4-4-4M5 17v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2" /></svg>
             Exportar CSV
           </a>}
-          <Link href="/contratos/nuevo" className="btn gap-2">
+          {s.role !== "legal" && <Link href="/contratos/nuevo" className="btn gap-2">
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4"><path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m-7-7h14" /></svg>
             Nuevo contrato
-          </Link>
+          </Link>}
         </div>
       </div>
+
+      <AdvisorObservationNotifications contracts={all} isAdvisor={s.role === "asesor"} />
+      <AdvisorSignedContractNotifications contracts={all} isAdvisor={s.role === "asesor"} readContractIds={readSignedNotifications} />
 
       <form className="panel grid gap-3 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-[minmax(220px,1fr)_minmax(170px,220px)_minmax(160px,200px)_auto] xl:items-end">
         <div>

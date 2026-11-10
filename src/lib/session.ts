@@ -1,7 +1,7 @@
 // Sin dependencias de next/headers: se usa también desde el middleware (edge).
 import { SignJWT, jwtVerify } from "jose";
 
-export type Role = "admin" | "administrativo" | "asesor";
+export type Role = "admin" | "administrativo" | "legal" | "asesor";
 export type Session = { username: string; name: string; role: Role };
 export const COOKIE = "session";
 

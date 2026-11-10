@@ -9,6 +9,18 @@ export type User = {
   active: boolean;
   passwordHash: string;
   createdAt: string;
+  advisorProfile?: AdvisorProfile;
+};
+
+export type AdvisorProfile = {
+  fullName: string;
+  identityNumber: string;
+  identityIssuedIn: string;
+  address: string;
+  mobile: string;
+  whatsapp: string;
+  email: string;
+  updatedAt: string;
 };
 
 const key = (u: string) => `user:${u.toLowerCase()}`;
@@ -37,7 +49,10 @@ export async function createUser(input: { username: string; name: string; role: 
   await redis.sadd("users:all", username);
 }
 
-export async function patchUser(username: string, patch: Partial<Pick<User, "active" | "role">> & { password?: string }) {
+export async function patchUser(
+  username: string,
+  patch: Partial<Pick<User, "active" | "role" | "advisorProfile">> & { password?: string },
+) {
   const u = await getUser(username);
   if (!u) throw new Error("Usuario no encontrado");
   const { password, ...rest } = patch;

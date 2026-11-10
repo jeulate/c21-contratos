@@ -96,9 +96,10 @@ Ejecuta `npm run lint`, `npm run typecheck` y `npm run build` localmente antes d
 
 | Rol | Permisos |
 |---|---|
-| `asesor` | Crear y editar sus propios contratos |
-| `administrativo` | Ver contratos, consultar el dashboard y exportar CSV |
-| `admin` | Permisos anteriores, crear o desactivar usuarios y cambiar contraseñas |
+| `asesor` | Mantener su perfil y crear/editar sus propios contratos; completar datos de propietario e inmueble y previsualizar/descargar el Word generado cuando Legal active el modelo. |
+| `administrativo` | Ver contratos, consultar el dashboard y exportar CSV. |
+| `legal` | Consultar contratos y gestionar versiones Word: cargar borradores, descargarlos y activar una versión; cambiar estados con observación registrada. |
+| `admin` | Permisos administrativos, crear o desactivar usuarios, cambiar contraseñas, gestionar plantillas y cambiar estados de contratos. |
 
 ## Estructura principal
 
@@ -110,9 +111,19 @@ src/lib/session.ts / auth.ts    Sesiones y autorización por rol
 src/middleware.ts               Protección de rutas
 src/app/actions.ts              Server Actions
 src/app/(app)/                  Dashboard, contratos y usuarios
-src/app/api/export/             Exportación CSV
+src/app/api/contratos/           Generación privada de documentos Word
+src/app/api/plantillas/          Descarga privada de plantillas
+src/app/api/export/              Exportación CSV
 scripts/seed-admin.mjs          Inicialización del administrador local
 ```
+
+## Flujo de plantillas Word
+
+Legal carga en **Plantillas legales** una copia `.docx` del modelo con marcadores de doble llave, la revisa y la activa. El sistema conserva cada versión y la asigna a los contratos nuevos de ese tipo. Los contratos existentes mantienen su versión original. El asesor completa los datos del propietario y del inmueble; su identidad se obtiene del perfil y queda guardada como snapshot en el contrato. Al guardar, la ficha del contrato muestra la vista previa Word y permite descargar el archivo generado.
+
+Los modelos originales deben conservarse como fuente legal. Antes de cargarlos, Legal sustituye cada espacio variable por un marcador compatible, por ejemplo `{{owner1.fullName}}`, `{{property.registry}}`, `{{advisor.fullName}}` o `{{contract.amount}}`. La página Plantillas legales muestra los marcadores que reconoce al cargar el archivo. El archivo se guarda en Redis local/privado y no debe agregarse al repositorio.
+
+En la ficha del contrato, Legal o Admin puede pasarlo de **Borrador** a **En revisión** o **Anulado**, devolverlo de revisión a borrador, y marcarlo como **Firmado** o **Anulado** desde revisión. Cada cambio exige una observación y queda en el historial. Los estados firmado y anulado son finales.
 
 ## Modelo de datos
 
@@ -128,7 +139,7 @@ scripts/seed-admin.mjs          Inicialización del administrador local
 
 - Adjuntar archivos PDF de contratos.
 - Exportar a Excel y filtrar por rangos de fechas.
-- Generar plantillas de contratos en PDF o Word.
+- Permitir anotaciones legales por campo y devolución estructurada al asesor.
 - Añadir límites a los intentos de inicio de sesión.
 - Incorporar gráficos mensuales de cierres y comisiones.
 - Añadir notificaciones por Telegram.
