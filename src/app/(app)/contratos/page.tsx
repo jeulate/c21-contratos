@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireSession, isStaff } from "@/lib/auth";
-import { listContracts } from "@/lib/contracts";
+import { listContracts, listReadSignedContractNotifications } from "@/lib/contracts";
 import { CONTRACT_TYPES, STATES, typeLabel } from "@/lib/contract-types";
 import { StateBadge } from "@/components/badge";
 import { AdvisorObservationNotifications } from "@/components/advisor-observation-notifications";
@@ -11,6 +11,7 @@ export default async function ContratosPage({ searchParams }: { searchParams: Pr
   const filters = await searchParams;
   const staff = isStaff(s);
   const all = await listContracts(staff ? undefined : { asesor: s.username });
+  const readSignedNotifications = s.role === "asesor" ? await listReadSignedContractNotifications(s.username) : [];
   const observedCount = s.role === "asesor" ? all.filter((contract) => contract.estado === "observado").length : 0;
   const q = filters.q?.toLowerCase().trim();
   const rows = all.filter(
@@ -43,7 +44,7 @@ export default async function ContratosPage({ searchParams }: { searchParams: Pr
       </div>
 
       <AdvisorObservationNotifications contracts={all} isAdvisor={s.role === "asesor"} />
-      <AdvisorSignedContractNotifications contracts={all} isAdvisor={s.role === "asesor"} />
+      <AdvisorSignedContractNotifications contracts={all} isAdvisor={s.role === "asesor"} readContractIds={readSignedNotifications} />
 
       <form className="panel grid gap-3 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-[minmax(220px,1fr)_minmax(170px,220px)_minmax(160px,200px)_auto] xl:items-end">
         <div>

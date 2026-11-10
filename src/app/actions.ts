@@ -8,7 +8,7 @@ import { requireSession, isStaff } from "@/lib/auth";
 import { COOKIE, signSession, Role } from "@/lib/session";
 import { AdvisorProfile, checkPassword, createUser, getUser, patchUser } from "@/lib/users";
 import { CONTRACT_TYPES, CURRENCIES, isTemplateBasedContract, STATES } from "@/lib/contract-types";
-import { changeContractState, ContractInput, createContract, getContract, updateContract, validateExtras } from "@/lib/contracts";
+import { changeContractState, ContractInput, createContract, getContract, markSignedContractNotificationAsRead, updateContract, validateExtras } from "@/lib/contracts";
 import { getActiveTemplate } from "@/lib/contract-templates";
 import { activateTemplateVersion, createTemplateVersion } from "@/lib/contract-templates";
 import { getContractCurrency, setContractCurrency } from "@/lib/contract-currencies";
@@ -190,6 +190,12 @@ export async function changeContractStateAction(id: string, _: FormState, fd: Fo
   revalidatePath("/contratos");
   revalidatePath(`/contratos/${id}`);
   return { ok: "Estado actualizado y registrado en el historial" };
+}
+
+export async function markSignedContractNotificationReadAction(id: string) {
+  const session = await requireSession(["asesor"]);
+  await markSignedContractNotificationAsRead(id, session.username);
+  revalidatePath("/contratos");
 }
 
 export async function uploadContractTemplateAction(_: FormState, fd: FormData): Promise<FormState> {

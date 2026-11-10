@@ -40,6 +40,19 @@ const ck = (id: string) => `contract:${id}`;
 
 export const getContract = (id: string) => redis.get<Contract>(ck(id));
 
+const signedNotificationReadKey = (username: string) => `contract-notifications:signed:read:${username}`;
+
+export const listReadSignedContractNotifications = (username: string) =>
+  redis.smembers(signedNotificationReadKey(username));
+
+export async function markSignedContractNotificationAsRead(id: string, username: string) {
+  const contract = await getContract(id);
+  if (!contract || contract.asesor !== username || contract.estado !== "firmado") {
+    throw new Error("No se pudo confirmar la lectura de esta notificación.");
+  }
+  await redis.sadd(signedNotificationReadKey(username), id);
+}
+
 export async function listContracts(opts?: { asesor?: string }): Promise<Contract[]> {
   const idx = opts?.asesor ? `contracts:by:${opts.asesor}` : "contracts:all";
   const ids = await redis.zrange<string[]>(idx, 0, -1, { rev: true });
