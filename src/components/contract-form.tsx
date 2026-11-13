@@ -151,7 +151,7 @@ export function ContractForm({ contract, advisorProfile, currencyByType, canMana
       {state.error && <p role="alert" className="text-sm text-red-700 lg:col-span-2">{state.error}</p>}
       {state.ok && <p role="status" className="text-sm text-emerald-700 lg:col-span-2">{state.ok}</p>}
       <div className="flex flex-col gap-2 lg:col-span-2">
-        {!contract && evidenceIds.length < MIN_CONTRACT_EVIDENCE_IMAGES && <p className="text-xs text-ink-mute dark:text-carbon-400">Completa la carga de al menos {MIN_CONTRACT_EVIDENCE_IMAGES} imágenes para habilitar el envío a Legal.</p>}
+        {!contract && evidenceIds.length < MIN_CONTRACT_EVIDENCE_IMAGES && <p className="text-xs text-ink-mute dark:text-carbon-400">Faltan {MIN_CONTRACT_EVIDENCE_IMAGES - evidenceIds.length} imágenes cargadas para completar el mínimo de {MIN_CONTRACT_EVIDENCE_IMAGES} y habilitar el envío a Legal.</p>}
         <SubmitButton disabled={!contract && (evidenceIds.length < MIN_CONTRACT_EVIDENCE_IMAGES || evidenceUploading)}>{contract ? "Guardar cambios" : "Crear y enviar a Legal"}</SubmitButton>
       </div>
     </form>
