@@ -47,3 +47,20 @@ export function ActivateTemplateForm({ id }: { id: string }) {
     </form>
   );
 }
+
+export function TemplateRevisionForm({ id, tipo }: { id: string; tipo: string }) {
+  const [state, action] = useFormState<FormState, FormData>(uploadContractTemplateAction, {});
+  return (
+    <form action={action} className="mt-4 grid gap-3 rounded-xl border border-stone-200 bg-stone-50 p-4 dark:border-carbon-800 dark:bg-carbon-950 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+      <input type="hidden" name="tipo" value={tipo} />
+      <input type="hidden" name="versionOrigen" value={id} />
+      <div>
+        <label className="label" htmlFor={`revision-${id}`}>Subir el Word actualizado (.docx, máximo 5 MB)</label>
+        <input id={`revision-${id}`} name="archivo" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="input" required />
+      </div>
+      <SubmitButton>Guardar nueva versión</SubmitButton>
+      {state.error && <p role="alert" className="text-sm text-red-700 sm:col-span-2">{state.error}</p>}
+      {state.ok && <p role="status" className="text-sm text-emerald-700 sm:col-span-2">{state.ok}</p>}
+    </form>
+  );
+}

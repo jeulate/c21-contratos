@@ -1,7 +1,7 @@
 import { requireSession } from "@/lib/auth";
 import { TEMPLATE_CONTRACT_TYPES } from "@/lib/contract-types";
 import { getActiveTemplate, listTemplateVersions } from "@/lib/contract-templates";
-import { ActivateTemplateForm, TemplateUploadForm } from "@/components/contract-template-actions";
+import { ActivateTemplateForm, TemplateRevisionForm, TemplateUploadForm } from "@/components/contract-template-actions";
 
 const statusLabel = { borrador: "Borrador", activa: "Activa", archivada: "Archivada" } as const;
 
@@ -45,6 +45,16 @@ export default async function PlantillasPage() {
                   <details className="text-xs text-ink-soft dark:text-carbon-300">
                     <summary className="cursor-pointer">Marcadores detectados ({version.tags.length})</summary>
                     <div className="mt-2 flex flex-wrap gap-1.5">{version.tags.map((tag) => <code key={tag} className="rounded bg-stone-100 px-2 py-1 dark:bg-carbon-800">{`{{${tag}}}`}</code>)}</div>
+                  </details>
+                  <details className="rounded-xl border border-stone-200 p-4 dark:border-carbon-800">
+                    <summary className="cursor-pointer text-sm font-medium text-ink dark:text-white">Editar términos de esta plantilla</summary>
+                    <p className="mt-3 text-xs leading-5 text-ink-mute dark:text-carbon-400">
+                      Descarga el Word, modifica sus cláusulas y súbelo aquí como una versión nueva. Conserva los marcadores indicados arriba exactamente como aparecen; el sistema verificará que no falte ninguno y que sean válidos para este modelo. La versión actual seguirá en uso hasta activar la nueva.
+                    </p>
+                    <div className="mt-3">
+                      <a className="btn-ghost text-xs" href={`/api/plantillas/${version.id}`}>Descargar versión para editar</a>
+                    </div>
+                    <TemplateRevisionForm id={version.id} tipo={type.id} />
                   </details>
                   {version.status !== "activa" && <ActivateTemplateForm id={version.id} />}
                 </article>

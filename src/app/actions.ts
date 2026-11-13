@@ -10,7 +10,7 @@ import { AdvisorProfile, checkPassword, createUser, getUser, patchUser } from "@
 import { CONTRACT_TYPES, CURRENCIES, isTemplateBasedContract, STATES } from "@/lib/contract-types";
 import { changeContractState, ContractInput, createContract, getContract, markSignedContractNotificationAsRead, updateContract, validateExtras } from "@/lib/contracts";
 import { getActiveTemplate } from "@/lib/contract-templates";
-import { activateTemplateVersion, createTemplateVersion } from "@/lib/contract-templates";
+import { activateTemplateVersion, createTemplateVersion, getTemplateVersion } from "@/lib/contract-templates";
 import { getContractCurrency, setContractCurrency } from "@/lib/contract-currencies";
 import { finalizeStagedContractEvidence, isEvidenceIdentifier, MIN_CONTRACT_EVIDENCE_IMAGES, MAX_CONTRACT_EVIDENCE_IMAGES, removeContractEvidenceFiles } from "@/lib/contract-evidence";
 import PizZip from "pizzip";
@@ -235,6 +235,11 @@ export async function markSignedContractNotificationReadAction(id: string) {
 export async function uploadContractTemplateAction(_: FormState, fd: FormData): Promise<FormState> {
   const session = await requireSession(["legal", "admin"]);
   const type = String(fd.get("tipo") ?? "");
+  const sourceId = String(fd.get("versionOrigen") ?? "").trim();
+  const sourceVersion = sourceId ? await getTemplateVersion(sourceId) : null;
+  if (sourceId && (!sourceVersion || sourceVersion.tipo !== type)) {
+    return { error: "La versión base no existe o no corresponde a este modelo de contrato." };
+  }
   const file = fd.get("archivo");
   if (!(file instanceof File) || file.size === 0) return { error: "Selecciona un archivo Word (.docx)." };
   if (!file.name.toLowerCase().endsWith(".docx")) return { error: "El archivo debe tener formato .docx." };
@@ -270,9 +275,13 @@ export async function uploadContractTemplateAction(_: FormState, fd: FormData): 
     ]);
     const unsupported = tags.filter((tag) => !supported.has(tag));
     if (unsupported.length) return { error: `Marcadores sin correspondencia para este modelo: ${unsupported.map((tag) => `{{${tag}}}`).join(", ")}` };
+    if (sourceVersion) {
+      const removed = sourceVersion.tags.filter((tag) => !tags.includes(tag));
+      if (removed.length) return { error: `La revisión debe conservar los marcadores de la versión base: ${removed.map((tag) => `{{${tag}}}`).join(", ")}` };
+    }
     await createTemplateVersion({ tipo: type, fileName: file.name, contentBase64: buffer.toString("base64"), tags, uploadedBy: session.username });
     revalidatePath("/plantillas");
-    return { ok: `Plantilla cargada. Se detectaron ${tags.length} marcadores; quedó como borrador para revisión legal.` };
+    return { ok: sourceVersion ? `Nueva versión creada como borrador. Se conservaron los marcadores de la versión ${sourceVersion.version}; revísala y actívala cuando esté aprobada.` : `Plantilla cargada. Se detectaron ${tags.length} marcadores; quedó como borrador para revisión legal.` };
   } catch (error) {
     return { error: `No se pudo leer la plantilla Word: ${(error as Error).message}` };
   }
