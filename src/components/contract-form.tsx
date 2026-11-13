@@ -144,7 +144,6 @@ export function ContractForm({ contract, advisorProfile, currencyByType, canMana
 
       {!contract && evidenceSessionId && <>
         <input type="hidden" name="evidenceSessionId" value={evidenceSessionId} />
-        <input type="hidden" name="evidenceIds" value={JSON.stringify(evidenceIds)} />
         <ContractEvidenceUploader sessionId={evidenceSessionId} onChange={onEvidenceChange} />
       </>}
 

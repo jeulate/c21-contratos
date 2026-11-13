@@ -77,7 +77,16 @@ export async function finalizeStagedContractEvidence(
   const finalDirectory = path.join(evidenceRoot(), "contracts", contractId);
   const manifests = await Promise.all(evidenceIds.map(async (id) => {
     const manifestPath = path.join(stagingDirectory, `${id}.json`);
-    const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as StagedEvidenceManifest;
+    let manifestContents: string;
+    try {
+      manifestContents = await readFile(manifestPath, "utf8");
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+        throw new Error("No se encontró una de las imágenes temporales. Vuelve a cargarla antes de crear el contrato.");
+      }
+      throw error;
+    }
+    const manifest = JSON.parse(manifestContents) as StagedEvidenceManifest;
     if (manifest.id !== id || !["image/webp", "image/jpeg", "image/png"].includes(manifest.mimeType) || manifest.size > MAX_CONTRACT_EVIDENCE_BYTES) {
       throw new Error("Una de las imágenes no es válida o supera el tamaño permitido.");
     }

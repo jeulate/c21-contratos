@@ -184,6 +184,7 @@ export function ContractEvidenceUploader({
 
   return (
     <section className="rounded-2xl border border-stone-200 bg-white p-4 dark:border-carbon-800 dark:bg-carbon-900 sm:p-5 lg:col-span-2">
+      <input type="hidden" name="evidenceIds" value={JSON.stringify(uploadedIds)} />
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-ink dark:text-white">Documentación de respaldo</h2>
