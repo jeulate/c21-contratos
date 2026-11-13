@@ -48,8 +48,8 @@ export function ContractEvidenceGallery({ contractId, evidencias }: { contractId
         {evidencias.map((evidence, index) => {
           return (
             <li key={evidence.id} className="overflow-hidden rounded-xl border border-stone-200 bg-white dark:border-carbon-800 dark:bg-carbon-950/50">
-              <button type="button" onClick={() => showImage(index)} aria-label={`Ampliar imagen ${index + 1}: ${evidence.fileName}`} className="block w-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold-600">
-                <Image src={`/api/contratos/${contractId}/evidencias/${evidence.id}`} alt={`Imagen de respaldo ${index + 1} del contrato ${contractId}`} width={640} height={480} unoptimized className="aspect-[4/3] w-full bg-stone-100 object-cover transition hover:brightness-95 dark:bg-carbon-900" />
+              <button type="button" onClick={() => showImage(index)} aria-label={`Ampliar imagen ${index + 1}: ${evidence.fileName}`} className="flex h-60 w-full items-center justify-center bg-stone-50 p-2 transition hover:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold-600 dark:bg-carbon-900 dark:hover:bg-carbon-800 sm:h-72">
+                <Image src={`/api/contratos/${contractId}/evidencias/${evidence.id}`} alt={`Imagen de respaldo ${index + 1} del contrato ${contractId}`} width={1200} height={900} unoptimized className="h-full w-full object-contain" />
               </button>
               <div className="px-3 py-2.5">
                 <p className="truncate text-xs font-medium text-ink dark:text-carbon-100">{evidence.fileName}</p>
