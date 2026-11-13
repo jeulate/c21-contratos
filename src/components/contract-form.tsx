@@ -32,7 +32,7 @@ export function ContractForm({ contract, advisorProfile, currencyByType, canMana
   const amountWords = amountInWords(monto, selectedCurrency);
 
   return (
-    <form action={action} className="panel grid gap-5 p-5 sm:p-6 lg:grid-cols-2">
+    <form action={action} className="panel grid w-full gap-5 p-5 sm:p-6 lg:grid-cols-2">
       <section className="rounded-xl border border-stone-200 bg-stone-50/70 p-4 dark:border-carbon-800 dark:bg-carbon-950/40">
         <div className="mb-4">
           <h2 className="text-sm font-semibold text-ink dark:text-white">Identificación del contrato</h2>

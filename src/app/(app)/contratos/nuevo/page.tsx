@@ -8,7 +8,7 @@ export default async function NuevoContrato() {
   const user = await getUser(session.username);
   const currencyByType = await getContractCurrencies();
   return (
-    <div className="mx-auto max-w-7xl space-y-5">
+    <div className="mx-auto w-full max-w-none space-y-5">
       <ContractForm advisorProfile={user?.advisorProfile} currencyByType={currencyByType} canManageState={false} evidenceSessionId={crypto.randomUUID()} />
     </div>
   );
