@@ -20,7 +20,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
     at: c.updatedAt,
   }] : [];
   return (
-    <div className="mx-auto max-w-4xl space-y-5">
+    <div className="mx-auto w-full max-w-none space-y-5">
       {s.role === "asesor" && observations.length > 0 && <section aria-label="Observaciones legales" className="space-y-3">
         {observations.map((observation) => <article key={observation.id} role="alert" className={`rounded-xl border p-4 shadow-sm ${observation.resolvedAt ? "border-stone-300 bg-stone-50 dark:border-carbon-700 dark:bg-carbon-900" : "border-amber-500 bg-amber-50 dark:border-gold-500/50 dark:bg-gold-500/10"}`}>
           <div className="flex items-start gap-3">
@@ -41,20 +41,32 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
         <StateBadge id={c.estado} />
         <span className="ml-auto text-sm text-ink-mute dark:text-carbon-400">Asesor: {c.asesorNombre}</span>
       </div>
-      <ContractDetailsSummary contract={c} />
-      {s.role === "legal" ? null : c.estado === "anulado" ? <section className="panel space-y-3 p-5 sm:p-6">
-        <div><h2 className="text-sm font-semibold text-ink dark:text-white">Contrato anulado</h2><p className="mt-1 text-sm text-ink-mute dark:text-carbon-400">Este contrato es de solo lectura y no admite más cambios.</p></div>
-        <dl className="grid gap-3 text-sm sm:grid-cols-2">
-          <div><dt className="text-ink-mute dark:text-carbon-400">Cliente / propietario</dt><dd className="font-medium">{c.cliente}</dd></div>
-          <div><dt className="text-ink-mute dark:text-carbon-400">Documento</dt><dd className="font-medium">{c.clienteDoc || "—"}</dd></div>
-          <div><dt className="text-ink-mute dark:text-carbon-400">Propiedad</dt><dd className="font-medium">{c.propiedad}</dd></div>
-          <div><dt className="text-ink-mute dark:text-carbon-400">Monto</dt><dd className="font-medium">{c.moneda} {c.monto.toLocaleString("es-BO")}</dd></div>
-        </dl>
-      </section> : <ContractForm contract={c} canManageState={false} />}
-      <ContractEvidenceGallery contractId={c.id} evidencias={c.evidencias ?? []} />
-      {(s.role === "legal" || s.role === "admin") && <ContractStatePanel id={c.id} currentState={c.estado} allowedStates={allowedContractTransitions(c.estado)} />}
-      {c.templateVersionId && <ContractDocumentPreview contractId={c.id} canDownload={s.role !== "asesor" || c.estado === "firmado"} />}
-      {!c.templateVersionId && <section className="panel p-5">
+      <div className="grid gap-5 xl:grid-cols-2">
+        {(s.role === "legal" || s.role === "admin") && <div className="space-y-5">
+          <ContractStatePanel id={c.id} currentState={c.estado} allowedStates={allowedContractTransitions(c.estado)} />
+          {c.templateVersionId && <ContractDocumentPreview contractId={c.id} canDownload />}
+          {!c.templateVersionId && <section className="panel p-5">
+            <h2 className="text-sm font-semibold text-ink dark:text-white">Vista previa Word</h2>
+            <p className="mt-1 text-sm text-ink-mute dark:text-carbon-400">Este contrato no tiene una plantilla Word versionada asociada.</p>
+          </section>}
+        </div>}
+        {(s.role === "legal" || s.role === "admin") ? <div>
+          <ContractDetailsSummary contract={c} />
+        </div> : <>
+          <div><ContractDetailsSummary contract={c} /></div>
+          <div><ContractEvidenceGallery contractId={c.id} evidencias={c.evidencias ?? []} /></div>
+        </>}
+        {s.role === "asesor" && <div className="xl:col-span-2">
+          {s.role === "asesor" && c.estado === "anulado" && <section className="panel p-5">
+            <h2 className="text-sm font-semibold text-ink dark:text-white">Contrato anulado</h2>
+            <p className="mt-1 text-sm text-ink-mute dark:text-carbon-400">Este contrato es de solo lectura y no admite más cambios.</p>
+          </section>}
+        </div>}
+      </div>
+      {(s.role === "legal" || s.role === "admin") && <ContractEvidenceGallery contractId={c.id} evidencias={c.evidencias ?? []} />}
+      {s.role === "asesor" && c.estado !== "anulado" && <ContractForm contract={c} canManageState={false} />}
+      {s.role === "asesor" && c.templateVersionId && <ContractDocumentPreview contractId={c.id} canDownload={c.estado === "firmado"} />}
+      {s.role === "asesor" && !c.templateVersionId && <section className="panel p-5">
         <h2 className="text-sm font-semibold text-ink dark:text-white">Vista previa Word</h2>
         <p className="mt-1 text-sm text-ink-mute dark:text-carbon-400">Este contrato fue creado antes de asignar una plantilla Word versionada. Los contratos nuevos de los modelos de exclusividad guardarán su versión de plantilla.</p>
       </section>}
