@@ -5,6 +5,7 @@ import { ContractForm } from "@/components/contract-form";
 import { StateBadge } from "@/components/badge";
 import { ContractStatePanel } from "@/components/contract-state-panel";
 import { ContractDocumentPreview } from "@/components/contract-document-preview";
+import { ContractEvidenceGallery } from "@/components/contract-evidence-gallery";
 
 export default async function ContratoPage({ params }: { params: Promise<{ id: string }> }) {
   const s = await requireSession();
@@ -61,6 +62,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
           <div><dt className="text-ink-mute dark:text-carbon-400">Monto</dt><dd className="font-medium">{c.moneda} {c.monto.toLocaleString("es-BO")}</dd></div>
         </dl>
       </section> : <ContractForm contract={c} canManageState={false} />}
+      <ContractEvidenceGallery contractId={c.id} evidencias={c.evidencias ?? []} />
       {(s.role === "legal" || s.role === "admin") && <ContractStatePanel id={c.id} currentState={c.estado} allowedStates={allowedContractTransitions(c.estado)} />}
       {c.templateVersionId && <ContractDocumentPreview contractId={c.id} canDownload={s.role !== "asesor" || c.estado === "firmado"} />}
       {!c.templateVersionId && <section className="panel p-5">

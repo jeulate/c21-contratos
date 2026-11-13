@@ -12,6 +12,7 @@ import { changeContractState, ContractInput, createContract, getContract, markSi
 import { getActiveTemplate } from "@/lib/contract-templates";
 import { activateTemplateVersion, createTemplateVersion } from "@/lib/contract-templates";
 import { getContractCurrency, setContractCurrency } from "@/lib/contract-currencies";
+import { finalizeStagedContractEvidence, isEvidenceIdentifier, MIN_CONTRACT_EVIDENCE_IMAGES, MAX_CONTRACT_EVIDENCE_IMAGES, removeContractEvidenceFiles } from "@/lib/contract-evidence";
 import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
 import InspectModule from "docxtemplater/js/inspect-module.js";
@@ -94,7 +95,40 @@ export async function saveContract(id: string | null, _: FormState, fd: FormData
     return { ok: current.estado === "observado" && session.role === "asesor" ? "Cambios guardados y contrato reenviado a revisión legal" : "Cambios guardados" };
   }
   const configuredCurrency = await getContractCurrency(parsed.data.tipo);
-  const created = await createContract({ ...input, estado: "revision", moneda: configuredCurrency }, session, creator?.advisorProfile, templateVersionId);
+  const evidenceSessionId = String(fd.get("evidenceSessionId") ?? "");
+  let evidenceIds: string[];
+  try {
+    const submittedIds = JSON.parse(String(fd.get("evidenceIds") ?? "[]")) as unknown;
+    if (!Array.isArray(submittedIds) || submittedIds.some((id) => typeof id !== "string")) throw new Error();
+    evidenceIds = submittedIds;
+  } catch {
+    return { error: "No se pudo verificar la lista de imágenes adjuntas. Vuelve a cargarlas." };
+  }
+  if (!isEvidenceIdentifier(evidenceSessionId)) return { error: "La sesión de carga de imágenes venció. Vuelve a cargar las imágenes." };
+  if (evidenceIds.length < MIN_CONTRACT_EVIDENCE_IMAGES || evidenceIds.length > MAX_CONTRACT_EVIDENCE_IMAGES) {
+    return { error: `Adjunta entre ${MIN_CONTRACT_EVIDENCE_IMAGES} y ${MAX_CONTRACT_EVIDENCE_IMAGES} imágenes de respaldo antes de crear el contrato.` };
+  }
+
+  const newContractId = crypto.randomUUID().slice(0, 8);
+  let evidencias;
+  try {
+    evidencias = await finalizeStagedContractEvidence(session.username, evidenceSessionId, newContractId, evidenceIds);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "No se pudieron asociar las imágenes al contrato." };
+  }
+  let created;
+  try {
+    created = await createContract(
+      { ...input, estado: "revision", moneda: configuredCurrency },
+      session,
+      creator?.advisorProfile,
+      templateVersionId,
+      { id: newContractId, evidencias },
+    );
+  } catch {
+    await removeContractEvidenceFiles(newContractId);
+    return { error: "No se pudo guardar el contrato. Las imágenes no se asociaron." };
+  }
   redirect(`/contratos/${created.id}`);
 }
 

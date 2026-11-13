@@ -1,6 +1,7 @@
 import { redis } from "./redis";
 import { CONTRACT_TYPES } from "./contract-types";
 import type { AdvisorProfile } from "./users";
+import type { ContractEvidence } from "./contract-evidence";
 
 export type Contract = {
   id: string;
@@ -8,6 +9,7 @@ export type Contract = {
   estado: string;
   observacion?: string;
   observations?: ContractObservation[];
+  evidencias?: ContractEvidence[];
   asesor: string; // username
   asesorNombre: string;
   asesorProfileSnapshot?: AdvisorProfile;
@@ -63,7 +65,8 @@ export async function listContracts(opts?: { asesor?: string }): Promise<Contrac
 
 export type ContractInput = Omit<
   Contract,
-  "id" | "asesor" | "asesorNombre" | "asesorProfileSnapshot" | "templateVersionId" | "createdAt" | "updatedAt" | "updatedBy" | "history"
+  | "id" | "asesor" | "asesorNombre" | "asesorProfileSnapshot" | "templateVersionId" | "evidencias"
+  | "createdAt" | "updatedAt" | "updatedBy" | "history"
 >;
 
 export async function createContract(
@@ -71,8 +74,9 @@ export async function createContract(
   by: { username: string; name: string },
   advisorProfile?: AdvisorProfile,
   templateVersionId?: string,
+  options?: { id?: string; evidencias?: ContractEvidence[] },
 ) {
-  const id = crypto.randomUUID().slice(0, 8);
+  const id = options?.id ?? crypto.randomUUID().slice(0, 8);
   const now = new Date().toISOString();
   const c: Contract = {
     ...input,
@@ -81,6 +85,7 @@ export async function createContract(
     asesorNombre: by.name,
     ...(advisorProfile ? { asesorProfileSnapshot: { ...advisorProfile } } : {}),
     ...(templateVersionId ? { templateVersionId } : {}),
+    ...(options?.evidencias?.length ? { evidencias: options.evidencias } : {}),
     createdAt: now,
     updatedAt: now,
     updatedBy: by.username,
