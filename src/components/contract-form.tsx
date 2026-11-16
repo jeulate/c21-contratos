@@ -11,6 +11,9 @@ import { MIN_CONTRACT_EVIDENCE_IMAGES } from "@/lib/contract-evidence-constants"
 import { SubmitButton } from "./submit-button";
 import { ContractEvidenceUploader } from "./contract-evidence-uploader";
 
+const textOnlyPattern = String.raw`[\p{L}\p{M}][\p{L}\p{M}\s.'’\-]*`;
+const phonePattern = String.raw`\+?[0-9][0-9\s().-]{5,19}`;
+
 export function ContractForm({ contract, advisorProfile, currencyByType, canManageState = true, evidenceSessionId }: { contract?: Contract; advisorProfile?: AdvisorProfile; currencyByType?: Record<string, Currency>; canManageState?: boolean; evidenceSessionId?: string }) {
   const [tipo, setTipo] = useState(contract?.tipo ?? CONTRACT_TYPES[0].id);
   const [monto, setMonto] = useState(contract ? String(contract.monto) : "");
@@ -66,7 +69,7 @@ export function ContractForm({ contract, advisorProfile, currencyByType, canMana
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="label" htmlFor="cliente">{templateBased ? "Nombre completo del propietario/a" : "Cliente"}</label>
-            <input id="cliente" name="cliente" defaultValue={contract?.cliente} className="input" required />
+            <input id="cliente" name="cliente" defaultValue={contract?.cliente} className="input" required pattern={templateBased ? textOnlyPattern : undefined} title={templateBased ? "Ingresa un nombre usando letras, espacios, apóstrofes, puntos o guiones." : undefined} />
           </div>
           <div>
             <label className="label" htmlFor="clienteDoc">{templateBased ? "Cédula de identidad" : "CI / NIT del cliente"}</label>
@@ -122,13 +125,29 @@ export function ContractForm({ contract, advisorProfile, currencyByType, canMana
           <div className="grid gap-4 pt-2 sm:grid-cols-2">
             {extras.filter((field) => (field.section ?? "Datos adicionales") === section).map((field) => {
               const fieldId = `x_${field.key}`;
-              const fieldLabel = field.key === "amountInWords" ? `Monto en palabras (${selectedCurrency})` : field.key === "pricePerHectare" ? `Precio por hectárea (${selectedCurrency})` : field.label;
+              const unit = field.unit === "currency" ? selectedCurrency : field.unit;
+              const fieldLabel = field.key === "amountInWords" ? `Monto en palabras (${selectedCurrency})` : unit ? `${field.label} (${unit})` : field.label;
               const isAmountInWords = field.key === "amountInWords";
               const defaultValue = contract?.tipo === tipo ? contract.extras[field.key] : "";
+              const inputType = field.type === "number" || field.type === "date" || field.type === "email" || field.type === "tel" ? field.type : "text";
+              const validationPattern = field.validation === "name" ? textOnlyPattern : field.validation === "phone" ? phonePattern : undefined;
+              const input = <input
+                id={fieldId}
+                name={fieldId}
+                type={inputType}
+                inputMode={field.type === "number" ? "decimal" : undefined}
+                min={field.type === "number" ? 0 : undefined}
+                step={field.type === "number" ? field.step ?? "any" : undefined}
+                pattern={validationPattern}
+                title={field.validation === "name" ? "Ingresa solo texto, espacios, apóstrofes, puntos o guiones." : field.validation === "phone" ? "Usa un teléfono válido con dígitos y, opcionalmente, +, espacios, paréntesis o guiones." : undefined}
+                defaultValue={defaultValue}
+                className="input min-w-0 flex-1"
+                required={field.required}
+              />;
               return (
                 <div key={`${tipo}-${field.key}`} className={field.type === "textarea" || isAmountInWords ? "sm:col-span-2" : ""}>
                   <label className="label" htmlFor={fieldId}>{fieldLabel}{field.required ? "" : " (opcional)"}</label>
-                  {field.type === "textarea" ? <textarea id={fieldId} name={fieldId} rows={3} defaultValue={defaultValue} className="input" required={field.required} /> : isAmountInWords ? <input id={fieldId} name={fieldId} value={amountWords} readOnly className="input bg-stone-50 uppercase dark:bg-carbon-950" aria-describedby="amountInWordsHelp" required={field.required} /> : <input id={fieldId} name={fieldId} type={field.type === "number" || field.type === "date" ? field.type : "text"} defaultValue={defaultValue} className="input" required={field.required} />}
+                  {field.type === "textarea" ? <textarea id={fieldId} name={fieldId} rows={3} defaultValue={defaultValue} className="input" required={field.required} /> : isAmountInWords ? <input id={fieldId} name={fieldId} value={amountWords} readOnly className="input bg-stone-50 uppercase dark:bg-carbon-950" aria-describedby="amountInWordsHelp" required={field.required} /> : unit ? <div className="flex min-w-0 items-stretch">{input}<span aria-hidden="true" className="inline-flex shrink-0 items-center rounded-r-xl border border-l-0 border-stone-300 bg-stone-50 px-3 text-sm font-semibold text-ink-soft dark:border-carbon-700 dark:bg-carbon-950 dark:text-carbon-200">{unit}</span></div> : input}
                   {isAmountInWords && <p id="amountInWordsHelp" className="mt-1 text-xs text-ink-mute dark:text-carbon-400">Se actualiza automáticamente al cambiar el monto.</p>}
                 </div>
               );

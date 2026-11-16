@@ -171,6 +171,24 @@ export function validateExtras(tipo: string, extras: Record<string, string>) {
   const t = CONTRACT_TYPES.find((x) => x.id === tipo);
   if (!t) return "Tipo de contrato inválido";
   for (const f of t.extras) if (f.required && !extras[f.key]?.trim()) return `Falta: ${f.label}`;
+  for (const field of t.extras) {
+    const value = extras[field.key]?.trim() ?? "";
+    if (!value) continue;
+    if (field.type === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value)) {
+      return `${field.label} debe tener un formato de correo válido`;
+    }
+    if (field.type === "number") {
+      const number = Number(value);
+      if (!Number.isFinite(number) || number < 0) return `${field.label} debe ser un número igual o mayor a cero`;
+      if (field.step === 1 && !Number.isInteger(number)) return `${field.label} debe ser un número entero`;
+    }
+    if (field.validation === "name" && !/^[\p{L}\p{M}][\p{L}\p{M}\s.'’\-]*$/u.test(value)) {
+      return `${field.label} solo debe contener texto, espacios, apóstrofes, puntos o guiones`;
+    }
+    if (field.validation === "phone" && !/^\+?[0-9][0-9\s().-]{5,19}$/.test(value)) {
+      return `${field.label} debe contener un número de teléfono válido`;
+    }
+  }
   if (["exclusiva-venta", "exclusiva-alquiler", "exclusiva-anticretico"].includes(tipo) && extras.owner2Name?.trim()) {
     const secondOwnerRequired = [
       ["owner2IdentityNumber", "Cédula del segundo propietario"],

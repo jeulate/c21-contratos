@@ -45,7 +45,10 @@ export function ContractDetailsSummary({ contract }: { contract: Contract }) {
           <div key={group}>
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-mute dark:text-carbon-400">{group}</h3>
             <dl className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-              {populated.map((field) => <Detail key={field.key} label={field.label} value={extras[field.key]} />)}
+              {populated.map((field) => {
+                const unit = field.unit === "currency" ? currency : field.unit;
+                return <Detail key={field.key} label={unit ? `${field.label} (${unit})` : field.label} value={extras[field.key]} />;
+              })}
             </dl>
           </div>
         );

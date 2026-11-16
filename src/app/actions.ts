@@ -58,6 +58,9 @@ export async function saveContract(id: string | null, _: FormState, fd: FormData
   if (session.role === "legal") return { error: "El área legal tiene acceso de revisión, no de edición de contratos." };
   const parsed = contractSchema.safeParse(Object.fromEntries(fd));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
+  if (isTemplateBasedContract(parsed.data.tipo) && !/^[\p{L}\p{M}][\p{L}\p{M}\s.'’\-]*$/u.test(parsed.data.cliente)) {
+    return { error: "El nombre del propietario solo debe contener texto, espacios, apóstrofes, puntos o guiones." };
+  }
 
   const extras: Record<string, string> = {};
   CONTRACT_TYPES.find((t) => t.id === parsed.data.tipo)?.extras.forEach((f) => {
