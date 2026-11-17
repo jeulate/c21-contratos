@@ -42,6 +42,11 @@ export function buildContractTemplateData(contract: Contract) {
     email: value(extras, "owner2Email"),
     whatsapp: value(extras, "owner2Whatsapp"),
   };
+  const owners = [
+    { ...owner1, number: "1" },
+    ...(owner2.fullName.trim() ? [{ ...owner2, number: "2" }] : []),
+    ...(contract.additionalOwners ?? []).map((owner, index) => ({ ...owner, email: "", whatsapp: "", number: String(index + 3) })),
+  ];
   const property = {
     reference: contract.propiedad,
     name: value(extras, "ruralPropertyName"),
@@ -96,6 +101,7 @@ export function buildContractTemplateData(contract: Contract) {
   return {
     owner1,
     owner2,
+    owners,
     property,
     advisor,
     contract: contractData,

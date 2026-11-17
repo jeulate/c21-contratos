@@ -4,9 +4,11 @@ import { useFormState } from "react-dom";
 import { login } from "../actions";
 import { SubmitButton } from "@/components/submit-button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { useState } from "react";
 
 export default function LoginPage() {
   const [state, action] = useFormState(login, {});
+  const [showPassword, setShowPassword] = useState(false);
 
   return (
     <main className="relative grid min-h-screen bg-white dark:bg-carbon-950 lg:grid-cols-[1.05fr_0.95fr]">
@@ -45,7 +47,23 @@ export default function LoginPage() {
             </div>
             <div>
               <div className="mb-1.5 flex items-center justify-between"><label className="label mb-0" htmlFor="password">Contraseña</label></div>
-              <input id="password" name="password" type="password" className="input h-12" autoComplete="current-password" required />
+              <div className="relative">
+                <input id="password" name="password" type={showPassword ? "text" : "password"} className="input h-12 pr-12" autoComplete="current-password" required />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  className="absolute inset-y-0 right-0 z-10 flex w-12 items-center justify-center rounded-r-xl text-ink-mute transition hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold-600 dark:text-carbon-400 dark:hover:text-white"
+                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                  aria-pressed={showPassword}
+                  aria-controls="password"
+                >
+                  {showPassword ? (
+                    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" /><circle cx="12" cy="12" r="3" /></svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8" /><path d="M9.9 5.2A10.7 10.7 0 0 1 12 5c5 0 8.5 4.1 9.5 6.5a11.7 11.7 0 0 1-3.1 4.2M6.2 6.2A12.2 12.2 0 0 0 2.5 11.5C3.5 14 7 18 12 18a9.8 9.8 0 0 0 3-.5" /></svg>
+                  )}
+                </button>
+              </div>
             </div>
             {state.error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">{state.error}</p>}
             <SubmitButton className="h-12 w-full">Ingresar al sistema</SubmitButton>
