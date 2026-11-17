@@ -7,7 +7,7 @@ export type ExtraField = {
   key: string;
   label: string;
   type?: "text" | "number" | "date" | "textarea" | "email" | "tel";
-  validation?: "name" | "phone";
+  validation?: "name" | "phone" | "identity";
   unit?: "m²" | "ha" | "currency";
   step?: number;
   required?: boolean;
@@ -19,14 +19,14 @@ export type ContractType = { id: string; label: string; extras: ExtraField[]; te
 const urbanModelFields: ExtraField[] = [
   { key: "owner1IssuedIn", label: "Lugar de expedición", required: true, section: "Propietario principal" },
   { key: "owner1Address", label: "Domicilio", required: true, section: "Propietario principal" },
-  { key: "owner1Email", label: "Correo de contacto", type: "email", section: "Comunicaciones" },
-  { key: "owner1Whatsapp", label: "WhatsApp de contacto", type: "tel", validation: "phone", section: "Comunicaciones" },
+  { key: "owner1Email", label: "Correo de contacto", type: "email", section: "Propietario principal" },
+  { key: "owner1Whatsapp", label: "WhatsApp de contacto", type: "tel", validation: "phone", section: "Propietario principal" },
   { key: "owner2Name", label: "Nombre completo", validation: "name", section: "Segundo propietario (opcional)" },
-  { key: "owner2IdentityNumber", label: "Cédula de identidad", section: "Segundo propietario (opcional)" },
+  { key: "owner2IdentityNumber", label: "Cédula de identidad", validation: "identity", section: "Segundo propietario (opcional)" },
   { key: "owner2IssuedIn", label: "Lugar de expedición", section: "Segundo propietario (opcional)" },
   { key: "owner2Address", label: "Domicilio", section: "Segundo propietario (opcional)" },
-  { key: "owner2Email", label: "Correo de contacto", type: "email", section: "Comunicaciones" },
-  { key: "owner2Whatsapp", label: "WhatsApp de contacto", type: "tel", validation: "phone", section: "Comunicaciones" },
+  { key: "owner2Email", label: "Correo de contacto", type: "email", section: "Segundo propietario (opcional)" },
+  { key: "owner2Whatsapp", label: "WhatsApp de contacto", type: "tel", validation: "phone", section: "Segundo propietario (opcional)" },
   { key: "propertyZone", label: "Zona", required: true, section: "Ubicación y registro del inmueble" },
   { key: "propertyUv", label: "UV", section: "Ubicación y registro del inmueble" },
   { key: "propertyBlock", label: "Manzana", section: "Ubicación y registro del inmueble" },

@@ -16,6 +16,7 @@ export type Contract = {
   templateVersionId?: string;
   cliente: string;
   clienteDoc: string;
+  additionalOwners?: AdditionalContractOwner[];
   propiedad: string;
   monto: number;
   moneda: string;
@@ -27,6 +28,13 @@ export type Contract = {
   updatedAt: string;
   updatedBy: string;
   history: { at: string; by: string; changes: string[] }[];
+};
+
+export type AdditionalContractOwner = {
+  fullName: string;
+  identityNumber: string;
+  identityIssuedIn: string;
+  address: string;
 };
 
 export type ContractObservation = {
@@ -188,6 +196,9 @@ export function validateExtras(tipo: string, extras: Record<string, string>) {
     if (field.validation === "phone" && !/^\+?[0-9][0-9\s().-]{5,19}$/.test(value)) {
       return `${field.label} debe contener un número de teléfono válido`;
     }
+    if (field.validation === "identity" && !/^[0-9]{4,12}(?:-(?=[A-Za-z0-9]{2,3}$)(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9]{2,3})?$/.test(value)) {
+      return `${field.label} debe tener de 4 a 12 dígitos y, si incluye complemento, un guion seguido de 2 o 3 caracteres que combinen letras y números (ejemplo: 785462-1D)`;
+    }
   }
   if (["exclusiva-venta", "exclusiva-alquiler", "exclusiva-anticretico"].includes(tipo) && extras.owner2Name?.trim()) {
     const secondOwnerRequired = [
@@ -198,6 +209,41 @@ export function validateExtras(tipo: string, extras: Record<string, string>) {
     for (const [key, label] of secondOwnerRequired) if (!extras[key]?.trim()) return `Falta: ${label}`;
   }
   return null;
+}
+
+const additionalOwnerIdentityPattern = /^[0-9]{4,12}(?:-(?=[A-Za-z0-9]{2,3}$)(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9]{2,3})?$/;
+const additionalOwnerNamePattern = /^[\p{L}\p{M}][\p{L}\p{M}\s.'’\-]*$/u;
+
+export function validateAdditionalOwners(value: unknown): { owners?: AdditionalContractOwner[]; error?: string } {
+  if (!Array.isArray(value)) return { error: "La lista de propietarios adicionales no tiene un formato válido." };
+  if (value.length > 18) return { error: "Se permite registrar hasta 18 propietarios adicionales." };
+
+  const owners: AdditionalContractOwner[] = [];
+  for (const [index, candidate] of value.entries()) {
+    const position = index + 3;
+    if (!candidate || typeof candidate !== "object") return { error: `Revisa los datos del propietario ${position}.` };
+    const row = candidate as Record<string, unknown>;
+    const owner = {
+      fullName: typeof row.fullName === "string" ? row.fullName.trim() : "",
+      identityNumber: typeof row.identityNumber === "string" ? row.identityNumber.trim() : "",
+      identityIssuedIn: typeof row.identityIssuedIn === "string" ? row.identityIssuedIn.trim() : "",
+      address: typeof row.address === "string" ? row.address.trim() : "",
+    };
+    if (!owner.fullName || !owner.identityNumber || !owner.identityIssuedIn || !owner.address) {
+      return { error: `Completa nombre, cédula, lugar de expedición y domicilio del propietario ${position}.` };
+    }
+    if (owner.fullName.length > 160 || !additionalOwnerNamePattern.test(owner.fullName)) {
+      return { error: `El nombre del propietario ${position} debe contener solo texto, espacios, apóstrofes, puntos o guiones.` };
+    }
+    if (!additionalOwnerIdentityPattern.test(owner.identityNumber)) {
+      return { error: `La cédula del propietario ${position} debe tener de 4 a 12 dígitos y, opcionalmente, un complemento como 785462-1D.` };
+    }
+    if (owner.identityIssuedIn.length > 100 || owner.address.length > 300) {
+      return { error: `El lugar de expedición o domicilio del propietario ${position} supera la longitud permitida.` };
+    }
+    owners.push(owner);
+  }
+  return { owners };
 }
 
 export function buildStats(contracts: Contract[]) {

@@ -11,7 +11,7 @@ function Detail({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function ContractDetailsSummary({ contract }: { contract: Contract }) {
+export function ContractDetailsSummary({ contract, title = "Información enviada para revisión", subtitle }: { contract: Contract; title?: string; subtitle?: string }) {
   const type = CONTRACT_TYPES.find((item) => item.id === contract.tipo);
   const currency = contract.moneda as Currency;
   const extras = contract.extras ?? {};
@@ -20,8 +20,8 @@ export function ContractDetailsSummary({ contract }: { contract: Contract }) {
   return (
     <section className="panel space-y-5 p-5 sm:p-6">
       <div>
-        <h2 className="text-sm font-semibold text-ink dark:text-white">Información enviada para revisión</h2>
-        <p className="mt-1 text-sm text-ink-mute dark:text-carbon-400">Datos registrados por el asesor · {typeLabel(contract.tipo)}</p>
+        <h2 className="text-sm font-semibold text-ink dark:text-white">{title}</h2>
+        <p className="mt-1 text-sm text-ink-mute dark:text-carbon-400">{subtitle ?? `Datos registrados por el asesor · ${typeLabel(contract.tipo)}`}</p>
       </div>
 
       <div>
@@ -53,6 +53,21 @@ export function ContractDetailsSummary({ contract }: { contract: Contract }) {
           </div>
         );
       })}
+
+      {contract.additionalOwners?.length ? <div>
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-mute dark:text-carbon-400">Propietarios adicionales</h3>
+        <div className="space-y-3">
+          {contract.additionalOwners.map((owner, index) => <div key={`${owner.identityNumber}-${index}`} className="rounded-xl border border-stone-200 p-3 dark:border-carbon-800">
+            <p className="mb-2 text-xs font-semibold text-ink dark:text-carbon-200">Propietario {index + 3}</p>
+            <dl className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              <Detail label="Nombre completo" value={owner.fullName} />
+              <Detail label="Cédula de identidad" value={owner.identityNumber} />
+              <Detail label="Lugar de expedición" value={owner.identityIssuedIn} />
+              <Detail label="Domicilio" value={owner.address} />
+            </dl>
+          </div>)}
+        </div>
+      </div> : null}
 
       {contract.notas.trim() && <div>
         <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-mute dark:text-carbon-400">Notas internas</h3>

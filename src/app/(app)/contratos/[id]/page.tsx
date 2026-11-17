@@ -7,12 +7,14 @@ import { ContractStatePanel } from "@/components/contract-state-panel";
 import { ContractDocumentPreview } from "@/components/contract-document-preview";
 import { ContractEvidenceGallery } from "@/components/contract-evidence-gallery";
 import { ContractDetailsSummary } from "@/components/contract-details-summary";
+import { getContractFormOptions } from "@/lib/contract-form-options";
 
 export default async function ContratoPage({ params }: { params: Promise<{ id: string }> }) {
   const s = await requireSession();
   const { id } = await params;
   const c = await getContract(id);
   if (!c || (!isStaff(s) && c.asesor !== s.username)) notFound();
+  const formOptions = await getContractFormOptions();
   const observations = c.observations?.length ? c.observations : c.observacion ? [{
     id: `legacy-${c.id}`,
     message: c.observacion,
@@ -50,7 +52,23 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
             <p className="mt-1 text-sm text-ink-mute dark:text-carbon-400">Este contrato no tiene una plantilla Word versionada asociada.</p>
           </section>}
         </div>}
-        {(s.role === "legal" || s.role === "admin") ? <div>
+        {s.role === "asesor" && c.estado === "firmado" ? <>
+          <div className="space-y-5">
+            {c.templateVersionId
+              ? <ContractDocumentPreview contractId={c.id} canDownload />
+              : <section className="panel p-5">
+                <h2 className="text-sm font-semibold text-ink dark:text-white">Contrato aprobado y firmado</h2>
+                <p className="mt-1 text-sm text-ink-mute dark:text-carbon-400">No hay una plantilla Word versionada asociada a este contrato para mostrar o descargar el documento.</p>
+              </section>}
+          </div>
+          <div className="space-y-5">
+            <section className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-500/30 dark:bg-emerald-500/10">
+              <h2 className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">Contrato aprobado por Legal</h2>
+              <p className="mt-1 text-sm text-emerald-800 dark:text-emerald-200">El documento está firmado y listo para impresión. Los datos quedaron bloqueados.</p>
+            </section>
+            <ContractDetailsSummary contract={c} title="Información aprobada" subtitle="Datos finales del contrato aprobado y firmado por Legal." />
+          </div>
+        </> : (s.role === "legal" || s.role === "admin") ? <div>
           <ContractDetailsSummary contract={c} />
         </div> : <>
           <div><ContractDetailsSummary contract={c} /></div>
@@ -64,8 +82,9 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
         </div>}
       </div>
       {(s.role === "legal" || s.role === "admin") && <ContractEvidenceGallery contractId={c.id} evidencias={c.evidencias ?? []} />}
-      {s.role === "asesor" && c.estado !== "anulado" && <ContractForm contract={c} canManageState={false} />}
-      {s.role === "asesor" && c.templateVersionId && <ContractDocumentPreview contractId={c.id} canDownload={c.estado === "firmado"} />}
+      {s.role === "asesor" && c.estado === "firmado" && c.evidencias?.length ? <ContractEvidenceGallery contractId={c.id} evidencias={c.evidencias ?? []} /> : null}
+      {s.role === "asesor" && c.estado !== "anulado" && c.estado !== "firmado" && <ContractForm contract={c} formOptions={formOptions} canManageState={false} />}
+      {s.role === "asesor" && c.estado !== "firmado" && c.templateVersionId && <ContractDocumentPreview contractId={c.id} canDownload={false} />}
       {s.role === "asesor" && !c.templateVersionId && <section className="panel p-5">
         <h2 className="text-sm font-semibold text-ink dark:text-white">Vista previa Word</h2>
         <p className="mt-1 text-sm text-ink-mute dark:text-carbon-400">Este contrato fue creado antes de asignar una plantilla Word versionada. Los contratos nuevos de los modelos de exclusividad guardarán su versión de plantilla.</p>
