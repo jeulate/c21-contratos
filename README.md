@@ -64,7 +64,7 @@ Abre [http://localhost:3000](http://localhost:3000) e ingresa con `ADMIN_USER` y
 
 Los datos de Redis se guardan en el volumen Docker `c21-contratos-redis-data`. Para reiniciar por completo la base local, ejecuta `docker compose down -v`; esto borra los datos y usuarios locales.
 
-Las imágenes de respaldo se comprimen en el navegador y se guardan fuera de Redis, en `storage/contract-evidence` (excluida de Git). Se requieren al menos 10 imágenes y se admiten hasta 20 por contrato; cada imagen se reduce a un máximo de 1 MB. Para cambiar la ubicación, configura `CONTRACT_EVIDENCE_DIR` en `.env.local`. Incluye esa carpeta en las copias de seguridad locales, ya que Redis solo conserva los metadatos de los adjuntos.
+Las imágenes de respaldo se comprimen en el navegador y se guardan fuera de Redis, en `storage/contract-evidence` (excluida de Git). Se requieren al menos 3 imágenes y se admiten hasta 20 por contrato; cada imagen se reduce a un máximo de 1 MB. Para cambiar la ubicación, configura `CONTRACT_EVIDENCE_DIR` en `.env.local`. Incluye esa carpeta en las copias de seguridad locales, ya que Redis solo conserva los metadatos de los adjuntos.
 
 ## Validación local antes de guardar cambios
 
