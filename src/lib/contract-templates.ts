@@ -86,3 +86,17 @@ export async function activateTemplateVersion(id: string, by: string) {
   ]);
   return activated;
 }
+
+export async function deleteTemplateVersion(id: string) {
+  const version = await getTemplateVersion(id);
+  if (!version) throw new Error("No se encontró la versión de plantilla.");
+  const activeId = await redis.get<string>(activeKey(version.tipo));
+  if (version.status === "activa" || activeId === version.id) {
+    throw new Error("No se puede eliminar la plantilla activa. Activa primero otra versión.");
+  }
+  await Promise.all([
+    redis.del(templateKey(version.id)),
+    redis.zrem(indexKey(version.tipo), version.id),
+  ]);
+  return version;
+}
