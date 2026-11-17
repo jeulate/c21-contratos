@@ -12,7 +12,10 @@
 @layer components {
   .btn { @apply inline-flex items-center justify-center rounded-lg bg-ink px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-50; }
   .btn-ghost { @apply inline-flex items-center justify-center rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-ink-soft transition hover:border-gold-600 hover:text-ink; }
-  .input { @apply w-full rounded-lg border border-stone-300 bg-white px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-mute focus:border-gold-600 focus:outline-none focus:ring-2 focus:ring-gold-300/50; }
+  .input { @apply w-full rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-mute transition-colors duration-150 hover:border-stone-400 focus:border-gold-600 focus:outline-none focus:ring-2 focus:ring-gold-500/25; }
+  select.input { @apply cursor-pointer appearance-none pr-11; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='m5 7.5 5 5 5-5' stroke='%23A28D5B' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 0.9rem center; background-size: 1rem; }
+  .input option { background-color: #ffffff; color: #252526; }
+  .input option:checked { background: linear-gradient(#BEAF87, #BEAF87); color: #252526; }
   .label { @apply mb-1.5 block text-sm font-medium text-ink-soft; }
   .panel { @apply rounded-2xl border border-stone-200 bg-white shadow-sm shadow-stone-900/[0.025]; }
   .th { @apply px-4 py-2.5 text-left text-xs font-medium text-ink-mute; }
@@ -23,7 +26,10 @@
   html.dark body { @apply bg-carbon-950 text-carbon-100; }
   html.dark .panel { @apply border-carbon-800 bg-carbon-900 shadow-black/10; }
   html.dark .btn-ghost { @apply border-carbon-700 bg-carbon-900 text-carbon-200 hover:border-gold-500 hover:text-white; }
-  html.dark .input { @apply border-carbon-700 bg-carbon-950 text-carbon-100 placeholder:text-carbon-500; }
+  html.dark .input { @apply border-carbon-700 bg-carbon-900 text-carbon-100 placeholder:text-carbon-400 hover:border-carbon-600 focus:border-gold-400 focus:ring-gold-400/25; }
+  html.dark select.input { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='m5 7.5 5 5 5-5' stroke='%23BFB48C' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+  html.dark .input option { background-color: #252526; color: #f7f7f7; }
+  html.dark .input option:checked { background: linear-gradient(#BEAF87, #BEAF87); color: #252526; }
   html.dark .label, html.dark .td { @apply text-carbon-300; }
   html.dark .text-ink { @apply text-carbon-100; }
   html.dark .text-ink-soft { @apply text-carbon-300; }
