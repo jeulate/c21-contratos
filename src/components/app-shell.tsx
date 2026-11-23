@@ -30,6 +30,11 @@ const pageName: Record<string, string> = {
   "/usuarios": "Usuarios",
   "/perfil": "Mi perfil",
   "/configuracion-contratos": "Configuración de contratos",
+  "/plantillas": "Plantillas legales",
+  "/plantillas/ventas": "Plantilla · Exclusiva de venta",
+  "/plantillas/alquiler": "Plantilla · Exclusiva de alquiler",
+  "/plantillas/anticretico": "Plantilla · Exclusiva de anticrético",
+  "/plantillas/rural": "Plantilla · Exclusiva rural",
 };
 
 export function AppShell({
@@ -45,7 +50,7 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const pageTitle = pageName[pathname] ?? (pathname.startsWith("/contratos/") ? "Detalle de contrato" : "C21 Contratos");
+  const pageTitle = pageName[pathname] ?? (pathname.startsWith("/contratos/") ? "Detalle de contrato" : pathname.startsWith("/plantillas/") ? "Plantilla legal" : "C21 Contratos");
   const initials = user.name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("");
 
   return (
@@ -67,7 +72,7 @@ export function AppShell({
         <div className="px-4 pb-2 pt-7 text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-mute dark:text-carbon-500">Espacio de trabajo</div>
         <nav aria-label="Navegación principal" className="flex-1 space-y-1 overflow-y-auto px-3 pb-4">
           {links.map((link) => {
-            const active = pathname === link.href || (link.href === "/contratos" && pathname.startsWith("/contratos/") && pathname !== "/contratos/nuevo");
+            const active = pathname === link.href || (link.href === "/contratos" && pathname.startsWith("/contratos/") && pathname !== "/contratos/nuevo") || (link.href === "/plantillas" && pathname.startsWith("/plantillas/"));
             return (
               <Link
                 key={link.href}
@@ -119,7 +124,7 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-9">
+        <main className={`mx-auto w-full px-4 py-6 sm:px-6 sm:py-8 ${pathname.startsWith("/plantillas/") ? "max-w-none lg:px-6 lg:py-6" : "max-w-[1600px] lg:px-8 lg:py-9"}`}>
           <div className="mb-6 sm:mb-8">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gold-700 dark:text-gold-300">Century 21 · Gestión</p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink dark:text-white sm:text-[28px]">{pageTitle}</h1>

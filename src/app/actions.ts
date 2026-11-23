@@ -12,6 +12,8 @@ import { changeContractState, ContractInput, createContract, getContract, listCo
 import { activateTemplateVersion, createTemplateVersion, deleteTemplateVersion, getActiveTemplate, getTemplateVersion } from "@/lib/contract-templates";
 import { getContractCurrency, setContractCurrency } from "@/lib/contract-currencies";
 import { setContractFormOptions } from "@/lib/contract-form-options";
+import type { CountryCallingCode } from "@/lib/contract-form-option-defaults";
+import { validateHtmlTemplateMarkers } from "@/lib/contract-html-document";
 import { finalizeStagedContractEvidence, isEvidenceIdentifier, MIN_CONTRACT_EVIDENCE_IMAGES, MAX_CONTRACT_EVIDENCE_IMAGES, removeContractEvidenceFiles } from "@/lib/contract-evidence";
 import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
@@ -176,12 +178,32 @@ function parseFormOptionList(value: string, label: string) {
   return options;
 }
 
+function parseCountryCallingCodes(value: string): CountryCallingCode[] {
+  const lines = value.split(/[\r\n]+/).map((line) => line.trim()).filter(Boolean);
+  if (!lines.length) throw new Error("Agrega al menos un código de país.");
+  if (lines.length > 250) throw new Error("La lista de códigos de país no puede superar 250 opciones.");
+  const options = lines.map((line) => {
+    const [rawCode, rawDial, ...rawName] = line.split("|").map((item) => item.trim());
+    const code = rawCode?.toUpperCase() ?? "";
+    const dial = rawDial ?? "";
+    const name = rawName.join(" | ").trim();
+    if (!/^[A-Z]{2}$/.test(code) || !/^\+[1-9][0-9]{0,3}$/.test(dial) || !/^[\p{L}\p{M}][\p{L}\p{M}\s.'’()-]{1,59}$/u.test(name)) {
+      throw new Error(`Formato inválido en “${line}”. Usa el código ISO de dos letras|PREFIJO|PAÍS, por ejemplo BO|+591|Bolivia.`);
+    }
+    return { code, dial, name };
+  });
+  const codes = options.map((item) => item.code);
+  if (new Set(codes).size !== codes.length) throw new Error("No repitas el código ISO de dos letras del país.");
+  return options;
+}
+
 export async function saveContractFormOptionsAction(_: FormState, fd: FormData): Promise<FormState> {
   await requireSession(["admin"]);
   try {
     const propertyTypes = parseFormOptionList(String(fd.get("propertyTypes") ?? ""), "Tipos de inmueble");
     const identityCities = parseFormOptionList(String(fd.get("identityCities") ?? ""), "Ciudades de expedición");
-    await setContractFormOptions({ propertyTypes, identityCities });
+    const countryCallingCodes = parseCountryCallingCodes(String(fd.get("countryCallingCodes") ?? ""));
+    await setContractFormOptions({ propertyTypes, identityCities, countryCallingCodes });
     revalidatePath("/configuracion-contratos");
     revalidatePath("/contratos/nuevo");
     revalidatePath("/contratos/[id]", "page");
@@ -331,6 +353,54 @@ export async function uploadContractTemplateAction(_: FormState, fd: FormData): 
     return { ok: sourceVersion ? `Nueva versión creada como borrador. Se conservaron los marcadores de la versión ${sourceVersion.version}; revísala y actívala cuando esté aprobada.` : `Plantilla cargada. Se detectaron ${tags.length} marcadores; quedó como borrador para revisión legal.` };
   } catch (error) {
     return { error: `No se pudo leer la plantilla Word: ${(error as Error).message}` };
+  }
+}
+
+export async function saveHtmlContractTemplateAction(_: FormState, fd: FormData): Promise<FormState> {
+  const session = await requireSession(["legal", "admin"]);
+  const tipo = String(fd.get("tipo") ?? "");
+  const sourceId = String(fd.get("versionOrigen") ?? "").trim();
+  const sourceVersion = sourceId ? await getTemplateVersion(sourceId) : null;
+  const htmlContent = String(fd.get("htmlContent") ?? "").trim();
+  const htmlStyles = String(fd.get("htmlStyles") ?? "").trim();
+  if (sourceId && (!sourceVersion || sourceVersion.tipo !== tipo)) return { error: "La plantilla base no existe o corresponde a otro tipo de contrato." };
+  if (Buffer.byteLength(htmlContent, "utf8") + Buffer.byteLength(htmlStyles, "utf8") > 1_500_000) return { error: "El contenido HTML y sus estilos no pueden superar 1.5 MB." };
+  if (!htmlContent || !/<[a-z][\s\S]*>/i.test(htmlContent)) return { error: "Escribe o convierte el contenido del contrato a HTML antes de guardar." };
+
+  const typeDefinition = CONTRACT_TYPES.find((item) => item.id === tipo && item.templateBased);
+  if (!typeDefinition) return { error: "Selecciona uno de los cuatro modelos de exclusividad." };
+  const supported = new Set([
+    "owner1.fullName", "owner1.identityNumber", "owner1.identityIssuedIn", "owner1.address", "owner1.email", "owner1.whatsapp",
+    "owner2.fullName", "owner2.identityNumber", "owner2.identityIssuedIn", "owner2.address", "owner2.email", "owner2.whatsapp",
+    "owners", "number", "fullName", "identityNumber", "identityIssuedIn", "address", "email", "whatsapp", "separator",
+    "property.reference", "property.name", "property.class", "property.activity", "property.department", "property.province",
+    "property.municipality", "property.hectares", "property.executorialTitle", "property.cadastralPlan", "property.registry",
+    "property.cadastralCertificate", "property.zone", "property.uv", "property.block", "property.lot", "property.type", "property.address",
+    "property.landArea", "property.builtArea", "property.bedroomCount", "property.suiteCount", "property.otherDetails", "property.liens",
+    "advisor.fullName", "advisor.identityNumber", "advisor.identityIssuedIn", "advisor.address", "advisor.mobile", "advisor.whatsapp", "advisor.email",
+    "contract.id", "contract.type", "contract.amount", "contract.amountNumeric", "contract.amountInWords", "contract.amountPerHectare",
+    "contract.currency", "contract.currencyName", "contract.currencySymbol", "contract.date", "contract.dateRaw", "contract.commission", "contract.status",
+    "client.name", "client.document", "propertyName", "amount", "currency", "currencyName", "currencySymbol", "date",
+    ...typeDefinition.extras.map((field) => `extras.${field.key}`),
+  ]);
+  const { tags, unsupported } = validateHtmlTemplateMarkers(htmlContent, supported);
+  if (unsupported.length) return { error: `Marcadores HTML sin correspondencia para este modelo: ${unsupported.map((tag) => `{{${tag}}}`).join(", ")}` };
+  if (!tags.length) return { error: "Incluye marcadores del contrato para vincular los datos registrados por el asesor." };
+
+  try {
+    const version = await createTemplateVersion({
+      tipo,
+      fileName: sourceVersion?.fileName.replace(/\.docx$/i, ".html") ?? `Contrato ${typeDefinition.label}.html`,
+      htmlContent,
+      htmlStyles,
+      format: "html",
+      tags,
+      uploadedBy: session.username,
+    });
+    revalidatePath("/plantillas");
+    return { ok: `Nueva versión HTML v${version.version} creada como borrador. Revísala y actívala para usarla en contratos nuevos.` };
+  } catch (error) {
+    return { error: (error as Error).message };
   }
 }
 

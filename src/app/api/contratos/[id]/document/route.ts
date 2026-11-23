@@ -3,6 +3,7 @@ import { getSession, isStaff } from "@/lib/auth";
 import { getContract } from "@/lib/contracts";
 import { getTemplateVersion } from "@/lib/contract-templates";
 import { renderContractDocx } from "@/lib/contract-document";
+import { renderContractHtml } from "@/lib/contract-html-document";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,19 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!template) return new NextResponse("No se encontró la versión Word usada por este contrato.", { status: 410 });
 
   try {
+    if (template.format === "html" || template.htmlContent) {
+      const html = renderContractHtml(contract, template);
+      const disposition = download ? "attachment" : "inline";
+      const fileName = `contrato-${contract.id}-v${template.version}.html`;
+      return new NextResponse(html, {
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Content-Disposition": `${disposition}; filename="${fileName}"`,
+          "Cache-Control": "private, no-store",
+        },
+      });
+    }
+    if (!template.contentBase64) return new NextResponse("La versión Word no tiene contenido disponible.", { status: 410 });
     const file = renderContractDocx(contract, template);
     const disposition = download ? "attachment" : "inline";
     const fileName = `contrato-${contract.id}-v${template.version}.docx`;

@@ -9,8 +9,11 @@ export type ContractTemplateVersion = {
   tipo: TemplateType;
   version: number;
   fileName: string;
-  contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-  contentBase64: string;
+  format?: "docx" | "html";
+  contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" | "text/html; charset=utf-8";
+  contentBase64?: string;
+  htmlContent?: string;
+  htmlStyles?: string;
   tags: string[];
   status: TemplateStatus;
   uploadedBy: string;
@@ -45,7 +48,10 @@ export async function getActiveTemplate(type: string) {
 export async function createTemplateVersion(input: {
   tipo: string;
   fileName: string;
-  contentBase64: string;
+  contentBase64?: string;
+  htmlContent?: string;
+  htmlStyles?: string;
+  format?: "docx" | "html";
   tags: string[];
   uploadedBy: string;
 }) {
@@ -57,8 +63,11 @@ export async function createTemplateVersion(input: {
     tipo: input.tipo,
     version: Math.max(0, ...versions.map((item) => item.version)) + 1,
     fileName: input.fileName,
-    contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    format: input.format ?? "docx",
+    contentType: input.format === "html" ? "text/html; charset=utf-8" : "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     contentBase64: input.contentBase64,
+    htmlContent: input.htmlContent,
+    htmlStyles: input.htmlStyles,
     tags: input.tags,
     status: "borrador",
     uploadedBy: input.uploadedBy,
