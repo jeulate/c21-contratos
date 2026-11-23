@@ -117,6 +117,7 @@ export function buildContractTemplateData(contract: Contract) {
 }
 
 export function renderContractDocx(contract: Contract, template: ContractTemplateVersion) {
+  if (!template.contentBase64) throw new Error("La versión seleccionada no contiene un documento Word.");
   const binary = Buffer.from(template.contentBase64, "base64");
   const zip = new PizZip(binary);
   const doc = new Docxtemplater(zip, {
