@@ -10,6 +10,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   const { id } = await params;
   const template = await getTemplateVersion(id);
   if (!template) return new NextResponse("Plantilla no encontrada", { status: 404 });
+  if (!template.contentBase64) return new NextResponse("Esta versión está en HTML y no tiene un archivo Word original.", { status: 409 });
   const bytes = Buffer.from(template.contentBase64, "base64");
   const safeName = template.fileName.replace(/[\r\n"\\]/g, "_");
   return new NextResponse(bytes, {

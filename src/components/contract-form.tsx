@@ -8,14 +8,27 @@ import { CONTRACT_TYPES, CURRENCY_NAMES, CURRENCY_SYMBOLS, isTemplateBasedContra
 import type { AdditionalContractOwner, Contract } from "@/lib/contracts";
 import type { AdvisorProfile } from "@/lib/users";
 import { MIN_CONTRACT_EVIDENCE_IMAGES } from "@/lib/contract-evidence-constants";
-import { DEFAULT_IDENTITY_CITIES, DEFAULT_PROPERTY_TYPES, type ContractFormOptions } from "@/lib/contract-form-option-defaults";
+import { DEFAULT_COUNTRY_CALLING_CODES, DEFAULT_IDENTITY_CITIES, DEFAULT_PROPERTY_TYPES, type ContractFormOptions } from "@/lib/contract-form-option-defaults";
 import { SubmitButton } from "./submit-button";
 import { ContractEvidenceUploader } from "./contract-evidence-uploader";
 import { CorporateSelect } from "./corporate-select";
+import { ContractPhoneInput } from "./contract-phone-input";
 
 const textOnlyPattern = String.raw`[\p{L}\p{M}][\p{L}\p{M}\s.'’\-]*`;
 const phonePattern = String.raw`\+?[0-9][0-9\s().-]{5,19}`;
 const identityNumberPattern = String.raw`[0-9]{4,12}(?:-(?=[A-Za-z0-9]{2,3}$)(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9]{2,3})?`;
+type FieldValidation = { status: "error" | "success"; message?: string };
+
+function validationMessage(field: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement, label: string) {
+  if (field.validity.valueMissing) return `Completa ${label.toLowerCase()}.`;
+  if (field instanceof HTMLInputElement && field.type === "email") return "Ingresa un correo electrónico válido, por ejemplo nombre@correo.com.";
+  if (field instanceof HTMLInputElement && field.type === "tel") return "Ingresa un WhatsApp válido con al menos 6 dígitos.";
+  if (field.validity.patternMismatch) return field.title || `Revisa el formato de ${label.toLowerCase()}.`;
+  if (field instanceof HTMLInputElement && field.validity.rangeUnderflow) return `El valor debe ser igual o mayor a ${field.min}.`;
+  if (field instanceof HTMLInputElement && field.validity.rangeOverflow) return `El valor debe ser igual o menor a ${field.max}.`;
+  if (field.validity.stepMismatch) return "Ingresa un número con el formato permitido.";
+  return field.validationMessage || `Revisa el valor de ${label.toLowerCase()}.`;
+}
 
 function SectionIcon({ type }: { type: "contract" | "owner" | "property" | "amount" | "advisor" | "group" | "details" }) {
   return <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gold-100 text-gold-700 dark:bg-carbon-800 dark:text-gold-300" aria-hidden="true">
@@ -37,7 +50,7 @@ export function ContractForm({ contract, advisorProfile, currencyByType, formOpt
   const [evidenceIds, setEvidenceIds] = useState<string[]>([]);
   const [additionalOwners, setAdditionalOwners] = useState<AdditionalContractOwner[]>(contract?.additionalOwners ?? []);
   const [evidenceUploading, setEvidenceUploading] = useState(false);
-  const [validationAlert, setValidationAlert] = useState("");
+  const [fieldValidation, setFieldValidation] = useState<Record<string, FieldValidation>>({});
   const onEvidenceChange = useCallback((ids: string[], uploading: boolean) => {
     setEvidenceIds(ids);
     setEvidenceUploading(uploading);
@@ -50,10 +63,39 @@ export function ContractForm({ contract, advisorProfile, currencyByType, formOpt
   const selectedProfile = contract?.asesorProfileSnapshot ?? advisorProfile;
   const propertyTypes = formOptions?.propertyTypes ?? [...DEFAULT_PROPERTY_TYPES];
   const identityCities = formOptions?.identityCities ?? [...DEFAULT_IDENTITY_CITIES];
+  const countryCallingCodes = formOptions?.countryCallingCodes ?? DEFAULT_COUNTRY_CALLING_CODES;
   const today = new Date().toISOString().slice(0, 10);
   const sections = [...new Set(extras.map((field) => field.section ?? "Datos adicionales"))];
   const amountLabel = tipo === "exclusiva-alquiler" ? "Canon de arrendamiento mensual" : tipo === "exclusiva-anticretico" ? "Monto referencial de anticrético" : tipo === "exclusiva-rural" ? "Precio total referencial" : "Precio referencial de venta";
   const amountWords = amountInWords(monto, selectedCurrency);
+  const firstValidationError = Object.values(fieldValidation).find((item) => item.status === "error");
+
+  const validationClass = (id: string) => {
+    const status = fieldValidation[id]?.status;
+    if (status === "error") return "border-red-500 focus:border-red-600 focus:ring-red-500/25 dark:border-red-400 dark:focus:border-red-300 dark:focus:ring-red-400/25";
+    if (status === "success") return "border-emerald-500 focus:border-emerald-600 focus:ring-emerald-500/25 dark:border-emerald-400 dark:focus:border-emerald-300 dark:focus:ring-emerald-400/25";
+    return "";
+  };
+
+  const updateFieldValidation = (field: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement) => {
+    if (!field.id || field.disabled || (field instanceof HTMLInputElement && (field.type === "hidden" || field.readOnly))) return;
+    const label = field.labels?.[0]?.textContent?.replace("(opcional)", "").trim() || field.name || field.id;
+    const optionalEmpty = !field.required && !field.value.trim();
+    setFieldValidation((current) => {
+      const next = { ...current };
+      if (optionalEmpty) delete next[field.id];
+      else if (field.validity.valid) next[field.id] = { status: "success" };
+      else next[field.id] = { status: "error", message: validationMessage(field, label) };
+      return next;
+    });
+  };
+
+  const fieldFeedback = (id: string, successText?: string) => {
+    const validation = fieldValidation[id];
+    if (validation?.status === "error") return <p id={`${id}Feedback`} className="mt-1 text-xs text-red-700 dark:text-red-300">{validation.message}</p>;
+    if (validation?.status === "success" && successText) return <p id={`${id}Feedback`} className="mt-1 text-xs text-emerald-700 dark:text-emerald-300">{successText}</p>;
+    return null;
+  };
 
   return (
     <form
@@ -61,23 +103,17 @@ export function ContractForm({ contract, advisorProfile, currencyByType, formOpt
       onBlurCapture={(event) => {
         const field = event.target;
         if (!(field instanceof HTMLInputElement || field instanceof HTMLSelectElement || field instanceof HTMLTextAreaElement)) return;
-        if (field.validity.valid) {
-          setValidationAlert("");
-          return;
-        }
-        const label = field.labels?.[0]?.textContent?.replace("(opcional)", "").trim() || field.name || field.id;
-        setValidationAlert(`${label}: ${field.validationMessage}`);
+        updateFieldValidation(field);
       }}
       onChangeCapture={(event) => {
         const field = event.target;
-        if ((field instanceof HTMLInputElement || field instanceof HTMLSelectElement || field instanceof HTMLTextAreaElement) && field.validity.valid) {
-          setValidationAlert("");
-        }
+        if (!(field instanceof HTMLInputElement || field instanceof HTMLSelectElement || field instanceof HTMLTextAreaElement)) return;
+        if (field.id && fieldValidation[field.id]) updateFieldValidation(field);
       }}
       className="panel grid w-full gap-5 p-5 sm:p-6 lg:grid-cols-2"
     >
       <input type="hidden" name="additionalOwnersJson" value={JSON.stringify(templateBased ? additionalOwners : [])} />
-      {validationAlert && <p role="alert" aria-live="polite" className="rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200 lg:col-span-2">{validationAlert}</p>}
+      {firstValidationError?.message && <p role="alert" aria-live="polite" className="rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200 lg:col-span-2">Revisa los campos resaltados antes de continuar. {firstValidationError.message}</p>}
       <section className="rounded-xl border border-stone-200 bg-stone-50/70 p-4 dark:border-carbon-800 dark:bg-carbon-950/40">
         <div className="mb-4 flex items-center gap-3">
           <SectionIcon type="contract" />
@@ -92,7 +128,8 @@ export function ContractForm({ contract, advisorProfile, currencyByType, formOpt
           </div>
           <div>
             <label className="label" htmlFor="fecha">Fecha del contrato</label>
-            <input id="fecha" name="fecha" type="date" defaultValue={contract?.fecha ?? today} className="input" required />
+            <input id="fecha" name="fecha" type="date" defaultValue={contract?.fecha ?? today} className={`input ${validationClass("fecha")}`} aria-invalid={fieldValidation.fecha?.status === "error"} aria-describedby={fieldValidation.fecha ? "fechaFeedback" : undefined} required />
+            {fieldFeedback("fecha")}
           </div>
           {canManageState ? <div>
             <label className="label" htmlFor="estado">Estado</label>
@@ -109,11 +146,13 @@ export function ContractForm({ contract, advisorProfile, currencyByType, formOpt
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="label" htmlFor="cliente">{templateBased ? "Nombre completo del propietario/a" : "Cliente"}</label>
-            <input id="cliente" name="cliente" defaultValue={contract?.cliente} className="input" required pattern={templateBased ? textOnlyPattern : undefined} title={templateBased ? "Ingresa un nombre usando letras, espacios, apóstrofes, puntos o guiones." : undefined} />
+            <input id="cliente" name="cliente" defaultValue={contract?.cliente} className={`input ${validationClass("cliente")}`} placeholder="Ej.: María Alejandra Cabrera Ávila" aria-invalid={fieldValidation.cliente?.status === "error"} aria-describedby={fieldValidation.cliente ? "clienteFeedback" : undefined} required pattern={templateBased ? textOnlyPattern : undefined} title={templateBased ? "Ingresa un nombre usando letras, espacios, apóstrofes, puntos o guiones." : undefined} />
+            {fieldFeedback("cliente")}
           </div>
           <div>
             <label className="label" htmlFor="clienteDoc">{templateBased ? "Cédula de identidad" : "CI / NIT del cliente"}</label>
-            <input id="clienteDoc" name="clienteDoc" defaultValue={contract?.clienteDoc} className="input" required={templateBased} pattern={templateBased ? identityNumberPattern : undefined} maxLength={16} aria-describedby={templateBased ? "clienteDocHelp" : undefined} title={templateBased ? "Ingresa de 4 a 12 dígitos; el complemento es opcional y lleva guion, 2 o 3 caracteres alfanuméricos con letras y números (ejemplo: 785462-1D)." : undefined} />
+            <input id="clienteDoc" name="clienteDoc" defaultValue={contract?.clienteDoc} className={`input ${validationClass("clienteDoc")}`} placeholder="Ej.: 785462-1D" required={templateBased} pattern={templateBased ? identityNumberPattern : undefined} maxLength={16} aria-invalid={fieldValidation.clienteDoc?.status === "error"} aria-describedby={[templateBased ? "clienteDocHelp" : "", fieldValidation.clienteDoc ? "clienteDocFeedback" : ""].filter(Boolean).join(" ") || undefined} title={templateBased ? "Ingresa de 4 a 12 dígitos; el complemento es opcional y lleva guion, 2 o 3 caracteres alfanuméricos con letras y números (ejemplo: 785462-1D)." : undefined} />
+            {fieldFeedback("clienteDoc")}
             {templateBased && <p id="clienteDocHelp" className="mt-1 text-xs text-ink-mute dark:text-carbon-400">4–12 dígitos; complemento opcional de 2–3 caracteres con letras y números, separado por guion. Ejemplo: 785462-1D.</p>}
           </div>
         </div>
@@ -126,7 +165,8 @@ export function ContractForm({ contract, advisorProfile, currencyByType, formOpt
         </div></div>
         <div>
           <label className="label" htmlFor="propiedad">{tipo === "exclusiva-rural" ? "Referencia / ubicación de la propiedad" : "Dirección o referencia del inmueble"}</label>
-          <input id="propiedad" name="propiedad" defaultValue={contract?.propiedad} className="input" required />
+          <input id="propiedad" name="propiedad" defaultValue={contract?.propiedad} className={`input ${validationClass("propiedad")}`} placeholder="Ej.: Av. Beni, 4.º anillo, edificio Los Álamos" aria-invalid={fieldValidation.propiedad?.status === "error"} aria-describedby={fieldValidation.propiedad ? "propiedadFeedback" : undefined} required />
+          {fieldFeedback("propiedad")}
         </div>
       </section>
 
@@ -144,12 +184,14 @@ export function ContractForm({ contract, advisorProfile, currencyByType, formOpt
                 <span className="text-sm font-semibold">{selectedCurrency} · {CURRENCY_SYMBOLS[selectedCurrency as Currency]}</span>
                 <span className="text-[10px] text-ink-mute dark:text-carbon-400">{CURRENCY_NAMES[selectedCurrency as Currency]}</span>
               </div>
-              <input id="monto" name="monto" type="number" step="0.01" min="0" value={monto} onChange={(event) => setMonto(event.target.value)} className="input" required />
+              <input id="monto" name="monto" type="number" step="0.01" min="0" value={monto} onChange={(event) => setMonto(event.target.value)} className={`input ${validationClass("monto")}`} placeholder="Ej.: 300000" aria-invalid={fieldValidation.monto?.status === "error"} aria-describedby={fieldValidation.monto ? "montoFeedback" : undefined} required />
+              {fieldFeedback("monto")}
             </div>
           </div>
           {!templateBased && <div>
             <label className="label" htmlFor="comision">Comisión (%)</label>
-            <input id="comision" name="comision" type="number" step="0.01" min="0" max="100" defaultValue={contract?.comision ?? 3} className="input" />
+            <input id="comision" name="comision" type="number" step="0.01" min="0" max="100" defaultValue={contract?.comision ?? 3} className={`input ${validationClass("comision")}`} placeholder="Ej.: 3" aria-invalid={fieldValidation.comision?.status === "error"} aria-describedby={fieldValidation.comision ? "comisionFeedback" : undefined} />
+            {fieldFeedback("comision")}
           </div>}
           {templateBased && <input type="hidden" name="comision" value="0" />}
         </div>
@@ -176,12 +218,14 @@ export function ContractForm({ contract, advisorProfile, currencyByType, formOpt
             {ownerSection && <>
               <div>
                 <label className="label" htmlFor="cliente">Nombre completo del propietario/a</label>
-                <input id="cliente" name="cliente" defaultValue={contract?.cliente} className="input" required pattern={textOnlyPattern} maxLength={160} title="Ingresa un nombre usando letras, espacios, apóstrofes, puntos o guiones." />
+                <input id="cliente" name="cliente" defaultValue={contract?.cliente} className={`input ${validationClass("cliente")}`} placeholder="Ej.: María Alejandra Cabrera Ávila" aria-invalid={fieldValidation.cliente?.status === "error"} aria-describedby={fieldValidation.cliente ? "clienteFeedback" : undefined} required pattern={textOnlyPattern} maxLength={160} title="Ingresa un nombre usando letras, espacios, apóstrofes, puntos o guiones." />
+                {fieldFeedback("cliente")}
               </div>
               <div>
                 <label className="label" htmlFor="clienteDoc">Cédula de identidad</label>
-                <input id="clienteDoc" name="clienteDoc" defaultValue={contract?.clienteDoc} className="input" required pattern={identityNumberPattern} maxLength={16} aria-describedby="clienteDocHelp" title="Ingresa de 4 a 12 dígitos; el complemento es opcional y lleva guion, 2 o 3 caracteres alfanuméricos con letras y números (ejemplo: 785462-1D)." />
+                <input id="clienteDoc" name="clienteDoc" defaultValue={contract?.clienteDoc} className={`input ${validationClass("clienteDoc")}`} placeholder="Ej.: 785462-1D" aria-invalid={fieldValidation.clienteDoc?.status === "error"} required pattern={identityNumberPattern} maxLength={16} aria-describedby={["clienteDocHelp", fieldValidation.clienteDoc ? "clienteDocFeedback" : ""].filter(Boolean).join(" ")} title="Ingresa de 4 a 12 dígitos; el complemento es opcional y lleva guion, 2 o 3 caracteres alfanuméricos con letras y números (ejemplo: 785462-1D)." />
                 <p id="clienteDocHelp" className="mt-1 text-xs text-ink-mute dark:text-carbon-400">4–12 dígitos; complemento opcional de 2–3 caracteres con letras y números, separado por guion. Ejemplo: 785462-1D.</p>
+                {fieldFeedback("clienteDoc")}
               </div>
             </>}
             {extras.filter((field) => (field.section ?? "Datos adicionales") === section).map((field) => {
@@ -197,6 +241,33 @@ export function ContractForm({ contract, advisorProfile, currencyByType, formOpt
                 : ["owner1IssuedIn", "owner2IssuedIn"].includes(field.key)
                   ? identityCities
                   : null;
+              const placeholders: Record<string, string> = {
+                owner1Address: "Ej.: Zona Norte, calle Los Cedros #123",
+                owner1Email: "nombre@correo.com",
+                owner1Whatsapp: "71234567",
+                owner2Name: "Ej.: Pedro Pérez",
+                owner2IdentityNumber: "Ej.: 785462-1D",
+                owner2Address: "Ej.: Barrio, calle y número",
+                owner2Email: "nombre@correo.com",
+                owner2Whatsapp: "71234567",
+                propertyZone: "Ej.: Equipetrol",
+                propertyUv: "Ej.: 15",
+                propertyBlock: "Ej.: 3",
+                propertyLot: "Ej.: 25",
+                propertyRegistry: "Ej.: 7.01.1.99.0001234",
+                propertyType: "Selecciona el tipo de inmueble",
+                propertyAddress: "Ej.: Av. Beni, 4.º anillo, edificio Los Álamos",
+                landArea: "Ej.: 320",
+                builtArea: "Ej.: 180",
+                bedroomCount: "Ej.: 3",
+                suiteCount: "Ej.: 1",
+                amountInWords: "Se completa desde el monto numérico",
+                hectares: "Ej.: 25.5",
+                department: "Ej.: Santa Cruz",
+                province: "Ej.: Andrés Ibáñez",
+                municipality: "Ej.: Santa Cruz de la Sierra",
+              };
+              const placeholder = placeholders[field.key] ?? (field.type === "textarea" ? `Ingresa ${field.label.toLowerCase()}` : `Ingresa ${field.label.toLowerCase()}`);
               const choices = configuredOptions
                 ? [...new Set([...configuredOptions, ...(defaultValue ? [defaultValue] : [])])]
                 : [];
@@ -204,8 +275,19 @@ export function ContractForm({ contract, advisorProfile, currencyByType, formOpt
                 id={fieldId}
                 name={fieldId}
                 defaultValue={defaultValue ?? ""}
+                placeholder={placeholder}
                 options={choices.map((option) => ({ value: option, label: option }))}
                 required={field.required}
+              /> : field.type === "tel" ? <ContractPhoneInput
+                id={fieldId}
+                name={fieldId}
+                defaultValue={defaultValue ?? ""}
+                required={field.required}
+                placeholder={placeholder}
+                validationClassName={validationClass(fieldId)}
+                countries={countryCallingCodes}
+                ariaInvalid={fieldValidation[fieldId]?.status === "error"}
+                ariaDescribedBy={fieldValidation[fieldId] ? `${fieldId}Feedback` : undefined}
               /> : <input
                 id={fieldId}
                 name={fieldId}
@@ -213,18 +295,22 @@ export function ContractForm({ contract, advisorProfile, currencyByType, formOpt
                 inputMode={field.type === "number" ? "decimal" : undefined}
                 min={field.type === "number" ? 0 : undefined}
                 step={field.type === "number" ? field.step ?? "any" : undefined}
+                placeholder={placeholder}
                 pattern={validationPattern}
                 title={field.validation === "name" ? "Ingresa solo texto, espacios, apóstrofes, puntos o guiones." : field.validation === "phone" ? "Usa un teléfono válido con dígitos y, opcionalmente, +, espacios, paréntesis o guiones." : field.validation === "identity" ? "Ingresa de 4 a 12 dígitos; el complemento opcional lleva guion y 2 o 3 caracteres alfanuméricos con letras y números (ejemplo: 785462-1D)." : undefined}
                 maxLength={field.validation === "identity" ? 16 : undefined}
-                aria-describedby={field.validation === "identity" ? `${fieldId}Help` : undefined}
+                aria-invalid={fieldValidation[fieldId]?.status === "error"}
+                aria-describedby={[field.validation === "identity" ? `${fieldId}Help` : "", fieldValidation[fieldId] ? `${fieldId}Feedback` : ""].filter(Boolean).join(" ") || undefined}
                 defaultValue={defaultValue}
-                className="input min-w-0 flex-1"
+                className={`input min-w-0 flex-1 ${validationClass(fieldId)}`}
                 required={field.required}
               />;
               return (
                 <div key={`${tipo}-${field.key}`} className={field.type === "textarea" || isAmountInWords ? "sm:col-span-2" : ""}>
                   <label className="label" htmlFor={fieldId}>{fieldLabel}{field.required ? "" : " (opcional)"}</label>
-                  {field.type === "textarea" ? <textarea id={fieldId} name={fieldId} rows={3} defaultValue={defaultValue} className="input" required={field.required} /> : isAmountInWords ? <input id={fieldId} name={fieldId} value={amountWords} readOnly className="input bg-stone-50 uppercase dark:bg-carbon-950" aria-describedby="amountInWordsHelp" required={field.required} /> : unit ? <div className="flex min-w-0 items-stretch">{input}<span aria-hidden="true" className="inline-flex shrink-0 items-center rounded-r-xl border border-l-0 border-stone-300 bg-stone-50 px-3 text-sm font-semibold text-ink-soft dark:border-carbon-700 dark:bg-carbon-950 dark:text-carbon-200">{unit}</span></div> : input}
+                  {field.type === "textarea" ? <textarea id={fieldId} name={fieldId} rows={3} defaultValue={defaultValue} className={`input ${validationClass(fieldId)}`} placeholder={placeholder} aria-invalid={fieldValidation[fieldId]?.status === "error"} aria-describedby={fieldValidation[fieldId] ? `${fieldId}Feedback` : undefined} required={field.required} /> : isAmountInWords ? <input id={fieldId} name={fieldId} value={amountWords} readOnly className="input bg-stone-50 uppercase dark:bg-carbon-950" placeholder={placeholder} aria-describedby="amountInWordsHelp" required={field.required} /> : unit ? <div className="flex min-w-0 items-stretch">{input}<span aria-hidden="true" className="inline-flex shrink-0 items-center rounded-r-xl border border-l-0 border-stone-300 bg-stone-50 px-3 text-sm font-semibold text-ink-soft dark:border-carbon-700 dark:bg-carbon-950 dark:text-carbon-200">{unit}</span></div> : input}
+                  {(field.type === "email" || field.type === "tel") && fieldFeedback(fieldId, field.type === "email" ? "Correo electrónico válido." : "Número de WhatsApp válido.")}
+                  {fieldValidation[fieldId]?.status === "error" && field.type !== "email" && field.type !== "tel" && fieldFeedback(fieldId)}
                   {field.validation === "identity" && <p id={`${fieldId}Help`} className="mt-1 text-xs text-ink-mute dark:text-carbon-400">4–12 dígitos; complemento opcional de 2–3 caracteres con letras y números, separado por guion. Ejemplo: 785462-1D.</p>}
                   {isAmountInWords && <p id="amountInWordsHelp" className="mt-1 text-xs text-ink-mute dark:text-carbon-400">Se actualiza automáticamente al cambiar el monto.</p>}
                 </div>
@@ -241,11 +327,13 @@ export function ContractForm({ contract, advisorProfile, currencyByType, formOpt
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
                       <label className="label" htmlFor={`additional-owner-${index}-name`}>Nombre completo</label>
-                      <input id={`additional-owner-${index}-name`} value={owner.fullName} onChange={(event) => updateOwner("fullName", event.target.value)} className="input" required pattern={textOnlyPattern} maxLength={160} title="Ingresa un nombre usando letras, espacios, apóstrofes, puntos o guiones." />
+                      <input id={`additional-owner-${index}-name`} value={owner.fullName} onChange={(event) => updateOwner("fullName", event.target.value)} className={`input ${validationClass(`additional-owner-${index}-name`)}`} placeholder="Ej.: Pedro Pérez" aria-invalid={fieldValidation[`additional-owner-${index}-name`]?.status === "error"} aria-describedby={fieldValidation[`additional-owner-${index}-name`] ? `additional-owner-${index}-nameFeedback` : undefined} required pattern={textOnlyPattern} maxLength={160} title="Ingresa un nombre usando letras, espacios, apóstrofes, puntos o guiones." />
+                      {fieldFeedback(`additional-owner-${index}-name`)}
                     </div>
                     <div>
                       <label className="label" htmlFor={`additional-owner-${index}-identity`}>Cédula de identidad</label>
-                      <input id={`additional-owner-${index}-identity`} value={owner.identityNumber} onChange={(event) => updateOwner("identityNumber", event.target.value)} className="input" required pattern={identityNumberPattern} maxLength={16} title="Ingresa de 4 a 12 dígitos; el complemento opcional lleva guion y 2 o 3 caracteres con letras y números (ejemplo: 785462-1D)." />
+                      <input id={`additional-owner-${index}-identity`} value={owner.identityNumber} onChange={(event) => updateOwner("identityNumber", event.target.value)} className={`input ${validationClass(`additional-owner-${index}-identity`)}`} placeholder="Ej.: 785462-1D" aria-invalid={fieldValidation[`additional-owner-${index}-identity`]?.status === "error"} aria-describedby={fieldValidation[`additional-owner-${index}-identity`] ? `additional-owner-${index}-identityFeedback` : undefined} required pattern={identityNumberPattern} maxLength={16} title="Ingresa de 4 a 12 dígitos; el complemento opcional lleva guion y 2 o 3 caracteres con letras y números (ejemplo: 785462-1D)." />
+                      {fieldFeedback(`additional-owner-${index}-identity`)}
                     </div>
                     <div>
                       <label className="label" htmlFor={`additional-owner-${index}-issued-in`}>Lugar de expedición</label>
@@ -260,7 +348,8 @@ export function ContractForm({ contract, advisorProfile, currencyByType, formOpt
                     </div>
                     <div>
                       <label className="label" htmlFor={`additional-owner-${index}-address`}>Domicilio</label>
-                      <input id={`additional-owner-${index}-address`} value={owner.address} onChange={(event) => updateOwner("address", event.target.value)} className="input" required maxLength={300} />
+                      <input id={`additional-owner-${index}-address`} value={owner.address} onChange={(event) => updateOwner("address", event.target.value)} className={`input ${validationClass(`additional-owner-${index}-address`)}`} placeholder="Ej.: Barrio, calle y número" aria-invalid={fieldValidation[`additional-owner-${index}-address`]?.status === "error"} aria-describedby={fieldValidation[`additional-owner-${index}-address`] ? `additional-owner-${index}-addressFeedback` : undefined} required maxLength={300} />
+                      {fieldFeedback(`additional-owner-${index}-address`)}
                     </div>
                     <button type="button" className="btn-ghost justify-self-start text-red-700 dark:text-red-300" onClick={() => setAdditionalOwners((current) => current.filter((_, itemIndex) => itemIndex !== index))}>Quitar propietario {position}</button>
                   </div>
@@ -283,7 +372,7 @@ export function ContractForm({ contract, advisorProfile, currencyByType, formOpt
 
       <section className="rounded-xl border border-stone-200 p-4 dark:border-carbon-800 lg:col-span-2">
         <label className="label" htmlFor="notas">Notas internas (opcional)</label>
-        <textarea id="notas" name="notas" rows={3} defaultValue={contract?.notas} className="input" />
+        <textarea id="notas" name="notas" rows={3} defaultValue={contract?.notas} className={`input ${validationClass("notas")}`} placeholder="Agrega información útil para la revisión legal, si corresponde." aria-invalid={fieldValidation.notas?.status === "error"} aria-describedby={fieldValidation.notas ? "notasFeedback" : undefined} />
       </section>
 
       {!contract && evidenceSessionId && <>

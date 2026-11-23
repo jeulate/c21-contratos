@@ -6,7 +6,7 @@ import { activateContractTemplateAction, deleteContractTemplateAction, uploadCon
 import { SubmitButton } from "./submit-button";
 import { TEMPLATE_CONTRACT_TYPES } from "@/lib/contract-types";
 
-export function TemplateUploadForm() {
+export function TemplateUploadForm({ selectedType }: { selectedType?: string }) {
   const [state, action] = useFormState<FormState, FormData>(uploadContractTemplateAction, {});
   return (
     <form action={action} className="panel grid gap-4 p-5 sm:grid-cols-2 sm:p-6">
@@ -14,13 +14,13 @@ export function TemplateUploadForm() {
         <h2 className="text-sm font-semibold text-ink dark:text-white">Cargar una versión Word</h2>
         <p className="mt-1 text-sm text-ink-mute dark:text-carbon-400">Los archivos se guardan en Redis privado como borradores. La plantilla no se usa hasta que Legal la active.</p>
       </div>
-      <div>
+      {selectedType ? <input type="hidden" name="tipo" value={selectedType} /> : <div>
         <label className="label" htmlFor="tipo">Modelo de contrato</label>
         <select id="tipo" name="tipo" className="input" required>
           {TEMPLATE_CONTRACT_TYPES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
         </select>
-      </div>
-      <div>
+      </div>}
+      <div className={selectedType ? "sm:col-span-2" : ""}>
         <label className="label" htmlFor="archivo">Documento Word (.docx, máximo 5 MB)</label>
         <input id="archivo" name="archivo" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="input" required />
       </div>
