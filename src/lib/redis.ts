@@ -1,6 +1,7 @@
 import Redis from "ioredis";
 
 const client = new Redis(process.env.REDIS_URL ?? "redis://127.0.0.1:6379", {
+  keyPrefix: process.env.REDIS_KEY_PREFIX ?? "c21-contratos:",
   lazyConnect: true,
   maxRetriesPerRequest: 1,
   retryStrategy: (attempt) => Math.min(attempt * 250, 2_000),
