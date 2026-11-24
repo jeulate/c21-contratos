@@ -64,7 +64,11 @@ Abre [http://localhost:3000](http://localhost:3000) e ingresa con `ADMIN_USER` y
 
 Los datos de Redis se guardan en el volumen Docker `c21-contratos-redis-data`. Para reiniciar por completo la base local, ejecuta `docker compose down -v`; esto borra los datos y usuarios locales.
 
-Las imágenes de respaldo se comprimen en el navegador y se guardan fuera de Redis, en `storage/contract-evidence` (excluida de Git). Se requieren al menos 3 imágenes y se admiten hasta 20 por contrato; cada imagen se reduce a un máximo de 1 MB. Para cambiar la ubicación, configura `CONTRACT_EVIDENCE_DIR` en `.env.local`. Incluye esa carpeta en las copias de seguridad locales, ya que Redis solo conserva los metadatos de los adjuntos.
+Las imágenes de respaldo se comprimen en el navegador y se guardan fuera de Redis. En desarrollo local usan `storage/contract-evidence` (excluida de Git); en Vercel deben usar Bunny Storage, porque el disco de una función no es persistente. Se requieren al menos 3 imágenes y se admiten hasta 20 por contrato; cada imagen se reduce a un máximo de 1 MB. Redis conserva los metadatos de los adjuntos y Bunny Storage sus archivos.
+
+Para Bunny, crea una Storage Zone privada y configura `CONTRACT_EVIDENCE_STORAGE=bunny`, `BUNNY_STORAGE_ZONE`, `BUNNY_STORAGE_PASSWORD` y `BUNNY_STORAGE_REGION` (código de región: `de`, `uk`, `ny`, `la`, `sg`, `se`, `br`, `jh` o `syd`). La contraseña se encuentra en la pestaña **Access** de la Storage Zone. En Vercel registra esas variables para Production, Preview y Development según corresponda; no uses el API key global de Bunny. Las imágenes se transfieren mediante la API privada de Storage y se sirven a través de las rutas autenticadas de C21, por lo que no se publican URLs directas del CDN.
+
+Para desarrollo local puedes seguir usando el disco con `CONTRACT_EVIDENCE_STORAGE=local` y, si quieres cambiar su carpeta, `CONTRACT_EVIDENCE_DIR`. La configuración local no debe usarse en Vercel.
 
 ## Validación local antes de guardar cambios
 
