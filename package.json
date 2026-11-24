@@ -14,6 +14,7 @@
     "db:logs": "docker compose logs -f redis"
   },
   "dependencies": {
+    "@vercel/blob": "^2.9.0",
     "bcryptjs": "^2.4.3",
     "clsx": "^2.1.1",
     "docx-preview": "^0.4.1",
@@ -41,7 +42,10 @@
   },
   "overrides": {
     "postcss": "$postcss",
-    "postcss-selector-parser": "^7.1.6"
+    "postcss-selector-parser": "^7.1.6",
+    "@vercel/oidc": {
+      "@vercel/cli-config": "0.3.8"
+    }
   },
   "engines": {
     "node": ">=22"
