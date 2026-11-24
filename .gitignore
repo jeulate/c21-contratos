@@ -19,3 +19,6 @@ next-env.d.ts
 .DS_Store
 Thumbs.db
 .vscode/*.local.json
+.vercel
+.env*
+!.env.example
