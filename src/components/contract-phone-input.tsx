@@ -100,7 +100,7 @@ export function ContractPhoneInput({
         value={number}
         onChange={(event) => setNumber(event.target.value)}
         placeholder={placeholder}
-        pattern="[0-9][0-9\\s().-]{5,19}"
+        pattern="[0-9][0-9\\s().\\-]{5,19}"
         title="Ingresa de 6 a 20 dígitos; puedes usar espacios, paréntesis o guiones."
         maxLength={20}
         required={required}

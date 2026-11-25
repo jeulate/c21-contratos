@@ -4,10 +4,12 @@ import { CONTRACT_TYPES, CURRENCIES } from "@/lib/contract-types";
 import { getContractCurrencies } from "@/lib/contract-currencies";
 import { getContractFormOptions } from "@/lib/contract-form-options";
 import { ContractFormOptionSettings } from "@/components/contract-form-option-settings";
+import { ContractPrintSettingsForm } from "@/components/contract-print-settings-form";
+import { getContractPrintSettings } from "@/lib/contract-print-settings";
 
 export default async function ContractSettingsPage() {
   await requireSession(["admin"]);
-  const [currencies, formOptions] = await Promise.all([getContractCurrencies(), getContractFormOptions()]);
+  const [currencies, formOptions, printSettings] = await Promise.all([getContractCurrencies(), getContractFormOptions(), getContractPrintSettings()]);
 
   return (
     <div className="space-y-5 sm:space-y-6">
@@ -22,6 +24,7 @@ export default async function ContractSettingsPage() {
       </div>
       <ContractCurrencySettings types={CONTRACT_TYPES} currencies={CURRENCIES} values={currencies} />
       <ContractFormOptionSettings options={formOptions} />
+      <ContractPrintSettingsForm settings={printSettings} />
     </div>
   );
 }

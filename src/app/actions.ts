@@ -9,9 +9,10 @@ import { COOKIE, signSession, Role } from "@/lib/session";
 import { AdvisorProfile, checkPassword, createUser, getUser, patchUser } from "@/lib/users";
 import { CONTRACT_TYPES, CURRENCIES, isTemplateBasedContract, STATES } from "@/lib/contract-types";
 import { changeContractState, ContractInput, createContract, getContract, listContracts, markSignedContractNotificationAsRead, updateContract, validateAdditionalOwners, validateExtras } from "@/lib/contracts";
-import { activateTemplateVersion, createTemplateVersion, deleteTemplateVersion, getActiveTemplate, getTemplateVersion } from "@/lib/contract-templates";
+import { activateTemplateVersion, createTemplateVersion, deleteTemplateVersion, getActiveTemplate, getTemplateVersion, listTemplateVersions } from "@/lib/contract-templates";
 import { getContractCurrency, setContractCurrency } from "@/lib/contract-currencies";
 import { setContractFormOptions } from "@/lib/contract-form-options";
+import { setContractPrintSettings } from "@/lib/contract-print-settings";
 import type { CountryCallingCode } from "@/lib/contract-form-option-defaults";
 import { validateHtmlTemplateMarkers } from "@/lib/contract-html-document";
 import { finalizeStagedContractEvidence, isEvidenceIdentifier, MIN_CONTRACT_EVIDENCE_IMAGES, MAX_CONTRACT_EVIDENCE_IMAGES, removeContractEvidenceFiles } from "@/lib/contract-evidence";
@@ -197,6 +198,36 @@ function parseCountryCallingCodes(value: string): CountryCallingCode[] {
   return options;
 }
 
+export async function saveContractPrintSettingsAction(_: FormState, fd: FormData): Promise<FormState> {
+  await requireSession(["admin"]);
+  const watermarkMode = String(fd.get("watermarkMode") ?? "");
+  if (!["text", "image", "none"].includes(watermarkMode)) return { error: "Selecciona una opción válida de marca de agua." };
+
+  let watermarkImage: string | undefined;
+  if (watermarkMode === "image") {
+    const candidate = String(fd.get("watermarkImage") ?? "");
+    const match = candidate.match(/^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/);
+    if (!match) return { error: "Carga una imagen PNG, JPG o WebP para usarla como marca de agua." };
+    const bytes = Buffer.from(match[2], "base64");
+    if (bytes.length > 300 * 1024) return { error: "La marca de agua no puede superar 300 KB." };
+    const validSignature = match[1] === "png"
+      ? bytes.subarray(0, 4).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47]))
+      : match[1] === "jpeg"
+        ? bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff
+        : bytes.subarray(0, 4).toString("ascii") === "RIFF" && bytes.subarray(8, 12).toString("ascii") === "WEBP";
+    if (!validSignature) return { error: "El archivo no coincide con su formato de imagen." };
+    watermarkImage = candidate;
+  }
+
+  try {
+    await setContractPrintSettings({ watermarkMode: watermarkMode as "text" | "image" | "none", watermarkImage });
+    revalidatePath("/configuracion-contratos");
+    return { ok: watermarkMode === "none" ? "Se guardó la impresión sin marca de agua." : "Se guardó la configuración de marca de agua." };
+  } catch (error) {
+    return { error: `No se pudo guardar la configuración de impresión: ${(error as Error).message}` };
+  }
+}
+
 export async function saveContractFormOptionsAction(_: FormState, fd: FormData): Promise<FormState> {
   await requireSession(["admin"]);
   try {
@@ -363,9 +394,25 @@ export async function saveHtmlContractTemplateAction(_: FormState, fd: FormData)
   const sourceVersion = sourceId ? await getTemplateVersion(sourceId) : null;
   const htmlContent = String(fd.get("htmlContent") ?? "").trim();
   const htmlStyles = String(fd.get("htmlStyles") ?? "").trim();
+  const headerLogoLeft = String(fd.get("headerLogoLeft") ?? "").trim();
+  const headerLogoRight = String(fd.get("headerLogoRight") ?? "").trim();
   if (sourceId && (!sourceVersion || sourceVersion.tipo !== tipo)) return { error: "La plantilla base no existe o corresponde a otro tipo de contrato." };
-  if (Buffer.byteLength(htmlContent, "utf8") + Buffer.byteLength(htmlStyles, "utf8") > 1_500_000) return { error: "El contenido HTML y sus estilos no pueden superar 1.5 MB." };
+  if (Buffer.byteLength(htmlContent, "utf8") + Buffer.byteLength(htmlStyles, "utf8") + Buffer.byteLength(headerLogoLeft, "utf8") + Buffer.byteLength(headerLogoRight, "utf8") > 1_500_000) return { error: "El HTML, los estilos y las imágenes no pueden superar 1.5 MB en total." };
   if (!htmlContent || !/<[a-z][\s\S]*>/i.test(htmlContent)) return { error: "Escribe o convierte el contenido del contrato a HTML antes de guardar." };
+
+  for (const [label, dataUrl] of [["izquierdo", headerLogoLeft], ["derecho", headerLogoRight]] as const) {
+    if (!dataUrl) continue;
+    const match = dataUrl.match(/^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/);
+    if (!match) return { error: `El logotipo ${label} debe ser PNG, JPG o WebP válido.` };
+    const imageBytes = Buffer.from(match[2], "base64");
+    if (imageBytes.length > 300 * 1024) return { error: `El logotipo ${label} no puede superar 300 KB.` };
+    const validSignature = match[1] === "png"
+      ? imageBytes.subarray(0, 4).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47]))
+      : match[1] === "jpeg"
+        ? imageBytes[0] === 0xff && imageBytes[1] === 0xd8 && imageBytes[2] === 0xff
+        : imageBytes.subarray(0, 4).toString("ascii") === "RIFF" && imageBytes.subarray(8, 12).toString("ascii") === "WEBP";
+    if (!validSignature) return { error: `El archivo del logotipo ${label} no coincide con su formato de imagen.` };
+  }
 
   const typeDefinition = CONTRACT_TYPES.find((item) => item.id === tipo && item.templateBased);
   if (!typeDefinition) return { error: "Selecciona uno de los cuatro modelos de exclusividad." };
@@ -388,11 +435,25 @@ export async function saveHtmlContractTemplateAction(_: FormState, fd: FormData)
   if (!tags.length) return { error: "Incluye marcadores del contrato para vincular los datos registrados por el asesor." };
 
   try {
+    const templateVersions = await listTemplateVersions(tipo);
+    const sourceWordVersion = sourceVersion?.sourceDocxVersionId || sourceVersion?.contentBase64
+      ? null
+      : templateVersions
+        .filter((item) => item.version < (sourceVersion?.version ?? Number.POSITIVE_INFINITY) && item.contentBase64 && !item.htmlContent)
+        .sort((a, b) => b.version - a.version)[0];
+    const sourceDocxVersionId = sourceVersion?.sourceDocxVersionId ?? (sourceVersion?.contentBase64 ? sourceVersion.id : sourceWordVersion?.id);
+    const sourceDocxFileName = sourceVersion?.sourceDocxFileName
+      ?? (sourceVersion?.contentBase64 ? sourceVersion.fileName : undefined)
+      ?? sourceWordVersion?.fileName;
     const version = await createTemplateVersion({
       tipo,
       fileName: sourceVersion?.fileName.replace(/\.docx$/i, ".html") ?? `Contrato ${typeDefinition.label}.html`,
       htmlContent,
       htmlStyles,
+      sourceDocxVersionId,
+      sourceDocxFileName,
+      headerLogoLeft: headerLogoLeft || undefined,
+      headerLogoRight: headerLogoRight || undefined,
       format: "html",
       tags,
       uploadedBy: session.username,
@@ -426,6 +487,10 @@ export async function deleteContractTemplateAction(_: FormState, fd: FormData): 
     const version = await getTemplateVersion(id);
     if (!version) return { error: "La versión ya no existe o fue eliminada." };
     if (version.status === "activa") return { error: "No se puede eliminar la versión activa. Activa otra versión primero." };
+    const templateVersions = await listTemplateVersions(version.tipo);
+    if (templateVersions.some((item) => item.sourceDocxVersionId === id)) {
+      return { error: "Esta versión Word es la fuente de una plantilla HTML y se conserva para que la descarga Word siga disponible." };
+    }
     const contracts = await listContracts();
     if (contracts.some((contract) => contract.templateVersionId === id)) {
       return { error: "Esta versión está asociada a contratos existentes y se conserva para mantener su vista previa y descarga." };

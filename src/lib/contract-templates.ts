@@ -14,6 +14,10 @@ export type ContractTemplateVersion = {
   contentBase64?: string;
   htmlContent?: string;
   htmlStyles?: string;
+  sourceDocxVersionId?: string;
+  sourceDocxFileName?: string;
+  headerLogoLeft?: string;
+  headerLogoRight?: string;
   tags: string[];
   status: TemplateStatus;
   uploadedBy: string;
@@ -51,6 +55,10 @@ export async function createTemplateVersion(input: {
   contentBase64?: string;
   htmlContent?: string;
   htmlStyles?: string;
+  sourceDocxVersionId?: string;
+  sourceDocxFileName?: string;
+  headerLogoLeft?: string;
+  headerLogoRight?: string;
   format?: "docx" | "html";
   tags: string[];
   uploadedBy: string;
@@ -68,6 +76,10 @@ export async function createTemplateVersion(input: {
     contentBase64: input.contentBase64,
     htmlContent: input.htmlContent,
     htmlStyles: input.htmlStyles,
+    sourceDocxVersionId: input.sourceDocxVersionId,
+    sourceDocxFileName: input.sourceDocxFileName,
+    headerLogoLeft: input.headerLogoLeft,
+    headerLogoRight: input.headerLogoRight,
     tags: input.tags,
     status: "borrador",
     uploadedBy: input.uploadedBy,
