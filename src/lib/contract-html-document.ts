@@ -58,16 +58,31 @@ export function renderContractHtml(contract: Contract, template: ContractTemplat
 <html lang="es">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
-@page { size: A4 portrait; margin: 20mm; }
+@page { size: A4 portrait; margin: 0; }
 html, body { margin: 0; padding: 0; color: #111; background: #fff; font-family: "Times New Roman", serif; font-size: 12pt; line-height: 1.45; }
 body { box-sizing: border-box; }
 img { max-width: 100%; height: auto; }
 table { max-width: 100%; border-collapse: collapse; }
 @media screen { body { width: 210mm; min-height: 297mm; margin: 20px auto; padding: 20mm; box-shadow: 0 1px 12px #0002; } }
-@media print { html, body { width: auto; min-height: 0; margin: 0; padding: 0; box-shadow: none; } .page-break { break-before: page; page-break-before: always; } }
 ${styles}
-@page { size: A4 portrait; margin: 20mm; }
-</style></head><body>${safeTemplateFragment(content)}</body></html>`;
+/* Keep print behavior after legal template styles so the generated watermark and layout rules remain active. */
+@page { size: A4 portrait; margin: 0; }
+@media print {
+  html, body { width: auto; min-height: 0; margin: 0; padding: 0; }
+  .c21-print-document {
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+    padding: 18mm 20mm;
+  }
+  .c21-print-document::before,
+  .c21-print-document::after { position: fixed; z-index: 0; pointer-events: none; color: #b7a56c; opacity: .14; font-family: Arial, sans-serif; font-weight: 700; }
+  .c21-print-document::before { content: "CENTURY 21"; top: 46%; left: 50%; font-size: 34pt; letter-spacing: .08em; white-space: nowrap; transform: translate(-50%, -50%) rotate(-32deg); }
+  .c21-print-document::after { content: "21"; top: 50%; left: 50%; display: grid; width: 34mm; height: 34mm; place-items: center; border: 2px solid currentColor; border-radius: 50%; font-size: 24pt; transform: translate(-50%, -50%) rotate(-32deg); }
+  .c21-print-document > * { position: relative; z-index: 1; }
+  .c21-contract-closing, [data-c21-closing], .c21-contract-signatures, [data-c21-signatures] { break-inside: avoid-page; page-break-inside: avoid; }
+  .page-break { break-before: page; page-break-before: always; }
+}
+</style></head><body><main class="c21-print-document">${safeTemplateFragment(content)}</main></body></html>`;
 }
 
 export function validateHtmlTemplateMarkers(source: string, supported: Set<string>) {
