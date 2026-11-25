@@ -79,7 +79,7 @@ export function ContractDocumentPreview({ contractId, canDownload = true }: { co
       {status && <p className="p-5 text-sm text-ink-mute dark:text-carbon-400">{status}</p>}
       {error && <p role="alert" className="p-5 text-sm text-red-700">{error}</p>}
       {htmlDocument && <div className="max-h-[80vh] overflow-auto bg-stone-100 p-3 dark:bg-carbon-950 sm:p-6">
-        <iframe ref={htmlFrameRef} title="Vista previa imprimible del contrato" srcDoc={htmlDocument} sandbox="allow-same-origin" onLoad={measureHtmlPages} className="h-[75vh] w-full rounded-lg border border-stone-200 bg-white dark:border-carbon-700" />
+        <iframe ref={htmlFrameRef} title="Vista previa imprimible del contrato" srcDoc={htmlDocument} sandbox="allow-same-origin allow-modals" onLoad={measureHtmlPages} className="h-[75vh] w-full rounded-lg border border-stone-200 bg-white dark:border-carbon-700" />
       </div>}
       {!htmlDocument && <div className="max-h-[80vh] overflow-auto bg-stone-100 p-3 dark:bg-carbon-950 sm:p-6">
         <div ref={styleRef} />
