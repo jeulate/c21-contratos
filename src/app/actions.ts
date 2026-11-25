@@ -12,6 +12,7 @@ import { changeContractState, ContractInput, createContract, getContract, listCo
 import { activateTemplateVersion, createTemplateVersion, deleteTemplateVersion, getActiveTemplate, getTemplateVersion, listTemplateVersions } from "@/lib/contract-templates";
 import { getContractCurrency, setContractCurrency } from "@/lib/contract-currencies";
 import { setContractFormOptions } from "@/lib/contract-form-options";
+import { setContractPrintSettings } from "@/lib/contract-print-settings";
 import type { CountryCallingCode } from "@/lib/contract-form-option-defaults";
 import { validateHtmlTemplateMarkers } from "@/lib/contract-html-document";
 import { finalizeStagedContractEvidence, isEvidenceIdentifier, MIN_CONTRACT_EVIDENCE_IMAGES, MAX_CONTRACT_EVIDENCE_IMAGES, removeContractEvidenceFiles } from "@/lib/contract-evidence";
@@ -195,6 +196,36 @@ function parseCountryCallingCodes(value: string): CountryCallingCode[] {
   const codes = options.map((item) => item.code);
   if (new Set(codes).size !== codes.length) throw new Error("No repitas el código ISO de dos letras del país.");
   return options;
+}
+
+export async function saveContractPrintSettingsAction(_: FormState, fd: FormData): Promise<FormState> {
+  await requireSession(["admin"]);
+  const watermarkMode = String(fd.get("watermarkMode") ?? "");
+  if (!["text", "image", "none"].includes(watermarkMode)) return { error: "Selecciona una opción válida de marca de agua." };
+
+  let watermarkImage: string | undefined;
+  if (watermarkMode === "image") {
+    const candidate = String(fd.get("watermarkImage") ?? "");
+    const match = candidate.match(/^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/);
+    if (!match) return { error: "Carga una imagen PNG, JPG o WebP para usarla como marca de agua." };
+    const bytes = Buffer.from(match[2], "base64");
+    if (bytes.length > 300 * 1024) return { error: "La marca de agua no puede superar 300 KB." };
+    const validSignature = match[1] === "png"
+      ? bytes.subarray(0, 4).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47]))
+      : match[1] === "jpeg"
+        ? bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff
+        : bytes.subarray(0, 4).toString("ascii") === "RIFF" && bytes.subarray(8, 12).toString("ascii") === "WEBP";
+    if (!validSignature) return { error: "El archivo no coincide con su formato de imagen." };
+    watermarkImage = candidate;
+  }
+
+  try {
+    await setContractPrintSettings({ watermarkMode: watermarkMode as "text" | "image" | "none", watermarkImage });
+    revalidatePath("/configuracion-contratos");
+    return { ok: watermarkMode === "none" ? "Se guardó la impresión sin marca de agua." : "Se guardó la configuración de marca de agua." };
+  } catch (error) {
+    return { error: `No se pudo guardar la configuración de impresión: ${(error as Error).message}` };
+  }
 }
 
 export async function saveContractFormOptionsAction(_: FormState, fd: FormData): Promise<FormState> {

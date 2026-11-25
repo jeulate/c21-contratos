@@ -1,5 +1,6 @@
 import type { Contract } from "./contracts";
 import type { ContractTemplateVersion } from "./contract-templates";
+import type { ContractPrintSettings } from "./contract-print-settings";
 import { buildContractTemplateData } from "./contract-document";
 
 const escapeHtml = (value: unknown) => String(value ?? "")
@@ -41,7 +42,7 @@ function safeTemplateFragment(source: string) {
     .replace(/(href|src)\s*=\s*(["'])\s*javascript:[\s\S]*?\2/gi, "$1=\"#\"");
 }
 
-export function renderContractHtml(contract: Contract, template: ContractTemplateVersion) {
+export function renderContractHtml(contract: Contract, template: ContractTemplateVersion, printSettings: ContractPrintSettings = { watermarkMode: "text" }, wordHeaderLogos: string[] = []) {
   if (!template.htmlContent) throw new Error("La versión HTML no contiene contenido editable.");
   const data = buildContractTemplateData(contract) as Record<string, unknown>;
   const embeddedStyles: string[] = [];
@@ -54,11 +55,21 @@ export function renderContractHtml(contract: Contract, template: ContractTemplat
     .join("\n")
     .replace(/@import\s+[^;]+;?/gi, "")
     .replace(/<\/style/gi, "");
+  const logoLeft = template.headerLogoLeft || wordHeaderLogos[0] || "";
+  const logoRight = template.headerLogoRight || wordHeaderLogos[1] || "";
   const headerImages = [
-    template.headerLogoLeft ? `<img class="c21-print-header__left" src="${escapeHtml(template.headerLogoLeft)}" alt="">` : "",
-    template.headerLogoRight ? `<img class="c21-print-header__right" src="${escapeHtml(template.headerLogoRight)}" alt="">` : "",
+    logoLeft ? `<img class="c21-print-header__left" src="${escapeHtml(logoLeft)}" alt="">` : "",
+    logoRight ? `<img class="c21-print-header__right" src="${escapeHtml(logoRight)}" alt="">` : "",
   ].filter(Boolean).join("");
   const header = headerImages ? `<header class="c21-print-header" aria-hidden="true">${headerImages}</header>` : "";
+  const watermark = printSettings.watermarkMode === "image" && printSettings.watermarkImage
+    ? `.c21-print-watermark { display: flex !important; position: fixed !important; z-index: 0 !important; inset: 0 !important; align-items: center !important; justify-content: center !important; pointer-events: none !important; } .c21-print-watermark img { display: block !important; width: 100mm !important; max-height: 100mm !important; opacity: .14 !important; object-fit: contain !important; transform: rotate(-32deg); } .c21-print-document::before, .c21-print-document::after { content: none; }`
+    : printSettings.watermarkMode === "none"
+      ? `.c21-print-document::before, .c21-print-document::after { content: none; } .c21-print-watermark { display: none !important; }`
+      : `.c21-print-watermark { display: none !important; } .c21-print-document::before { content: "CENTURY 21"; top: 46%; left: 50%; font-size: 34pt; letter-spacing: .08em; white-space: nowrap; transform: translate(-50%, -50%) rotate(-32deg); } .c21-print-document::after { content: "21"; top: 50%; left: 50%; display: grid; width: 34mm; height: 34mm; place-items: center; border: 2px solid currentColor; border-radius: 50%; font-size: 24pt; transform: translate(-50%, -50%) rotate(-32deg); }`;
+  const watermarkElement = printSettings.watermarkMode === "image" && printSettings.watermarkImage
+    ? `<div class="c21-print-watermark" aria-hidden="true"><img src="${escapeHtml(printSettings.watermarkImage)}" alt=""></div>`
+    : "";
   return `<!doctype html>
 <html lang="es">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -82,24 +93,37 @@ ${styles}
     padding: 18mm 20mm;
   }
   .c21-print-document > .c21-print-header {
-    position: fixed;
-    z-index: 2;
-    top: 4mm;
-    right: 20mm;
-    left: 20mm;
-    height: 10mm;
-    min-height: 0;
-    margin: 0;
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: fixed !important;
+    z-index: 2 !important;
+    top: 4mm !important;
+    right: 20mm !important;
+    left: 20mm !important;
+    height: 10mm !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+  }
+  .c21-print-document > .c21-print-header img {
+    display: block !important;
+    visibility: visible !important;
+    position: static !important;
+    float: none !important;
+    opacity: 1 !important;
+    filter: none !important;
+    max-width: 48mm !important;
+    max-height: 12mm !important;
+    object-fit: contain !important;
   }
   .c21-print-document::before,
   .c21-print-document::after { position: fixed; z-index: 0; pointer-events: none; color: #b7a56c; opacity: .14; font-family: Arial, sans-serif; font-weight: 700; }
-  .c21-print-document::before { content: "CENTURY 21"; top: 46%; left: 50%; font-size: 34pt; letter-spacing: .08em; white-space: nowrap; transform: translate(-50%, -50%) rotate(-32deg); }
-  .c21-print-document::after { content: "21"; top: 50%; left: 50%; display: grid; width: 34mm; height: 34mm; place-items: center; border: 2px solid currentColor; border-radius: 50%; font-size: 24pt; transform: translate(-50%, -50%) rotate(-32deg); }
+  ${watermark}
   .c21-print-document > * { position: relative; z-index: 1; }
   .c21-contract-closing, [data-c21-closing], .c21-contract-signatures, [data-c21-signatures] { break-inside: avoid-page; page-break-inside: avoid; }
   .page-break { break-before: page; page-break-before: always; }
 }
-</style></head><body><main class="c21-print-document">${safeTemplateFragment(content)}</main></body></html>`;
+</style></head><body>${watermarkElement}<main class="c21-print-document">${header}${safeTemplateFragment(content)}</main></body></html>`;
 }
 
 export function validateHtmlTemplateMarkers(source: string, supported: Set<string>) {
