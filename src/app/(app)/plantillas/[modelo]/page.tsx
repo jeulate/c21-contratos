@@ -36,6 +36,9 @@ export default async function ContractTemplateTypePage({ params }: { params: Pro
   for (const contract of contracts) {
     if (contract.templateVersionId) references.set(contract.templateVersionId, (references.get(contract.templateVersionId) ?? 0) + 1);
   }
+  for (const version of versions) {
+    if (version.sourceDocxVersionId) references.set(version.sourceDocxVersionId, (references.get(version.sourceDocxVersionId) ?? 0) + 1);
+  }
 
   return <div className="w-full space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -88,7 +91,7 @@ export default async function ContractTemplateTypePage({ params }: { params: Pro
                 <ContractTemplateHtmlEditor version={version} />
                 <div className="flex flex-wrap items-center justify-between gap-3 border-t border-stone-200 pt-4 dark:border-carbon-800">
                   {version.status !== "activa" ? <ActivateTemplateForm id={version.id} /> : <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Versión activa para contratos nuevos</span>}
-                  {removable ? <DeleteTemplateForm id={version.id} version={version.version} fileName={version.fileName} /> : <span className="text-right text-xs text-ink-mute dark:text-carbon-400">{version.status === "activa" ? "No se puede eliminar la versión activa." : `Conservada porque está vinculada a ${usedBy} ${usedBy === 1 ? "contrato" : "contratos"}.`}</span>}
+                  {removable ? <DeleteTemplateForm id={version.id} version={version.version} fileName={version.fileName} /> : <span className="text-right text-xs text-ink-mute dark:text-carbon-400">{version.status === "activa" ? "No se puede eliminar la versión activa." : `Conservada porque tiene ${usedBy} ${usedBy === 1 ? "referencia" : "referencias"}.`}</span>}
                 </div>
               </div>
             </details>;

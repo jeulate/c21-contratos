@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useFormState } from "react-dom";
+import Image from "next/image";
 import { saveHtmlContractTemplateAction, type FormState } from "@/app/actions";
 import type { ContractTemplateVersion } from "@/lib/contract-templates";
 import { SubmitButton } from "./submit-button";
@@ -26,7 +27,7 @@ body:focus{outline:none}h1{font-size:2em}h2{font-size:1.5em}h3{font-size:1.2em}
 }
 
 function EditorTool({ label, title, command, run }: { label: string; title: string; command: string; run: (command: string, value?: string) => void }) {
-  return <button type="button" title={title} aria-label={title} onMouseDown={(event) => event.preventDefault()} onClick={() => run(command, command === "formatBlock" ? label : undefined)} className="grid h-9 min-w-9 place-items-center rounded-md border border-stone-200 bg-white px-2.5 text-sm font-semibold text-ink-soft transition hover:border-gold-500 hover:bg-gold-50 hover:text-ink dark:border-carbon-700 dark:bg-carbon-900 dark:text-carbon-200 dark:hover:border-gold-500 dark:hover:bg-carbon-800 dark:hover:text-white">{label}</button>;
+  return <button type="button" title={title} aria-label={title} onMouseDown={(event) => event.preventDefault()} onClick={() => run(command, command === "formatBlock" ? label : undefined)} className="btn-ghost h-9 min-w-9 rounded-md px-2.5 py-1.5 text-sm">{label}</button>;
 }
 
 export function ContractTemplateHtmlEditor({ version }: { version: ContractTemplateVersion }) {
@@ -37,8 +38,38 @@ export function ContractTemplateHtmlEditor({ version }: { version: ContractTempl
   const [mode, setMode] = useState<"visual" | "code">("visual");
   const [editorDocument, setEditorDocument] = useState(() => buildEditorDocument(initial.content, version.htmlStyles ?? initial.styles));
   const [showMarkers, setShowMarkers] = useState(false);
+  const [headerLogoLeft, setHeaderLogoLeft] = useState(version.headerLogoLeft ?? "");
+  const [headerLogoRight, setHeaderLogoRight] = useState(version.headerLogoRight ?? "");
+  const [logoError, setLogoError] = useState("");
   const editorRef = useRef<HTMLIFrameElement>(null);
+  const leftLogoInputRef = useRef<HTMLInputElement>(null);
+  const rightLogoInputRef = useRef<HTMLInputElement>(null);
   const savedSelection = useRef<Range | null>(null);
+
+  function loadHeaderLogo(file: File | undefined, side: "left" | "right") {
+    if (!file) return;
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      setLogoError("Usa una imagen PNG, JPG o WebP.");
+      return;
+    }
+    if (file.size > 300 * 1024) {
+      setLogoError("Cada imagen debe pesar máximo 300 KB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = typeof reader.result === "string" ? reader.result : "";
+      if (!dataUrl.startsWith(`data:${file.type};base64,`)) {
+        setLogoError("No se pudo leer la imagen. Vuelve a seleccionarla.");
+        return;
+      }
+      setLogoError("");
+      if (side === "left") setHeaderLogoLeft(dataUrl);
+      else setHeaderLogoRight(dataUrl);
+    };
+    reader.onerror = () => setLogoError("No se pudo leer la imagen. Vuelve a seleccionarla.");
+    reader.readAsDataURL(file);
+  }
 
   function syncVisual() {
     const doc = editorRef.current?.contentDocument;
@@ -80,11 +111,37 @@ export function ContractTemplateHtmlEditor({ version }: { version: ContractTempl
       <input type="hidden" name="tipo" value={version.tipo} />
       <input type="hidden" name="versionOrigen" value={version.id} />
       <input type="hidden" name="htmlStyles" value={styles} />
+      <input type="hidden" name="headerLogoLeft" value={headerLogoLeft} />
+      <input type="hidden" name="headerLogoRight" value={headerLogoRight} />
+
+      <section className="rounded-xl border border-stone-200 p-4 dark:border-carbon-700">
+        <div>
+          <h3 className="text-sm font-semibold text-ink dark:text-white">Logos del encabezado impreso</h3>
+          <p className="mt-1 text-xs leading-5 text-ink-mute dark:text-carbon-400">Se repiten en la parte superior de cada página y se guardan en esta versión de la plantilla. PNG, JPG o WebP; máximo 300 KB por imagen.</p>
+        </div>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          {(["left", "right"] as const).map((side) => {
+            const value = side === "left" ? headerLogoLeft : headerLogoRight;
+            const inputRef = side === "left" ? leftLogoInputRef : rightLogoInputRef;
+            const label = side === "left" ? "Logotipo izquierdo" : "Emblema derecho";
+            return <div key={side} className="rounded-lg border border-stone-200 p-3 dark:border-carbon-700">
+              <p className="mb-2 text-xs font-medium text-ink-soft dark:text-carbon-200">{label}</p>
+              {value ? <div className="flex min-h-20 items-center justify-between gap-3 rounded-md bg-stone-50 p-3 dark:bg-carbon-950">
+                <Image src={value} alt={`Vista previa: ${label}`} width={240} height={60} unoptimized className="max-h-14 max-w-[75%] object-contain" />
+                <button type="button" onClick={() => { side === "left" ? setHeaderLogoLeft("") : setHeaderLogoRight(""); if (inputRef.current) inputRef.current.value = ""; }} className="btn-ghost shrink-0 px-2.5 py-1.5 text-xs">Quitar</button>
+              </div> : <p className="rounded-md bg-stone-50 px-3 py-4 text-xs text-ink-mute dark:bg-carbon-950 dark:text-carbon-400">No hay imagen seleccionada.</p>}
+              <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/webp" aria-label={`Cargar ${label}`} onChange={(event) => loadHeaderLogo(event.target.files?.[0], side)} className="input mt-3 text-xs" />
+            </div>;
+          })}
+        </div>
+        {logoError && <p role="alert" className="mt-3 text-xs text-red-700 dark:text-red-300">{logoError}</p>}
+      </section>
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-stone-50 p-4 dark:bg-carbon-950">
         <div>
           <h3 className="text-sm font-semibold text-ink dark:text-white">Contenido del contrato</h3>
           <p className="mt-1 text-sm text-ink-mute dark:text-carbon-400">Pega el texto del contrato en Visual para conservar formato, o cambia a Código para ajustar HTML y marcadores.</p>
+          <p className="mt-2 max-w-4xl text-xs leading-5 text-ink-mute dark:text-carbon-400">Para que la última hoja no quede solo con firmas, en Código agrupa la última cláusula, la fecha y las firmas dentro de <code className="rounded bg-stone-200 px-1 dark:bg-carbon-800">&lt;section class=&quot;c21-contract-closing&quot;&gt;...&lt;/section&gt;</code>. Conserva el texto legal actual; el estilo de impresión mantiene ese bloque unido si cabe en una página.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={clearDocument} className="btn-ghost text-xs">Vaciar editor</button>
@@ -102,8 +159,8 @@ export function ContractTemplateHtmlEditor({ version }: { version: ContractTempl
       <section className="overflow-hidden rounded-xl border border-stone-200 dark:border-carbon-700">
         <div className="flex items-center justify-between border-b border-stone-200 bg-stone-50 px-4 pt-3 dark:border-carbon-700 dark:bg-carbon-950">
           <div className="flex gap-1" role="tablist" aria-label="Modo del editor HTML">
-            <button type="button" role="tab" aria-selected={mode === "visual"} onClick={() => { setEditorDocument(buildEditorDocument(content, styles)); setMode("visual"); }} className={`border-b-2 px-4 py-2.5 text-sm font-medium ${mode === "visual" ? "border-gold-600 text-gold-800 dark:text-gold-300" : "border-transparent text-ink-mute dark:text-carbon-400"}`}>Visual</button>
-            <button type="button" role="tab" aria-selected={mode === "code"} onClick={() => { syncVisual(); setMode("code"); }} className={`border-b-2 px-4 py-2.5 text-sm font-medium ${mode === "code" ? "border-gold-600 text-gold-800 dark:text-gold-300" : "border-transparent text-ink-mute dark:text-carbon-400"}`}>Código</button>
+            <button type="button" role="tab" aria-selected={mode === "visual"} onClick={() => { setEditorDocument(buildEditorDocument(content, styles)); setMode("visual"); }} className={`rounded-t-md border-b-2 px-4 py-2.5 text-sm font-semibold transition ${mode === "visual" ? "border-gold-700 bg-[#BEAF87] text-[#252526]" : "border-transparent bg-gold-100 text-ink-soft hover:bg-[#d2c08f] dark:bg-carbon-800 dark:text-carbon-200 dark:hover:bg-[#d2c08f]"}`}>Visual</button>
+            <button type="button" role="tab" aria-selected={mode === "code"} onClick={() => { syncVisual(); setMode("code"); }} className={`rounded-t-md border-b-2 px-4 py-2.5 text-sm font-semibold transition ${mode === "code" ? "border-gold-700 bg-[#BEAF87] text-[#252526]" : "border-transparent bg-gold-100 text-ink-soft hover:bg-[#d2c08f] dark:bg-carbon-800 dark:text-carbon-200 dark:hover:bg-[#d2c08f]"}`}>Código</button>
           </div>
           <span className="pb-2 text-xs text-ink-mute dark:text-carbon-400">Editor de contrato</span>
         </div>
