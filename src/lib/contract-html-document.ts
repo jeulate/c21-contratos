@@ -54,6 +54,11 @@ export function renderContractHtml(contract: Contract, template: ContractTemplat
     .join("\n")
     .replace(/@import\s+[^;]+;?/gi, "")
     .replace(/<\/style/gi, "");
+  const headerImages = [
+    template.headerLogoLeft ? `<img class="c21-print-header__left" src="${escapeHtml(template.headerLogoLeft)}" alt="">` : "",
+    template.headerLogoRight ? `<img class="c21-print-header__right" src="${escapeHtml(template.headerLogoRight)}" alt="">` : "",
+  ].filter(Boolean).join("");
+  const header = headerImages ? `<header class="c21-print-header" aria-hidden="true">${headerImages}</header>` : "";
   return `<!doctype html>
 <html lang="es">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -64,6 +69,8 @@ body { box-sizing: border-box; }
 img { max-width: 100%; height: auto; }
 table { max-width: 100%; border-collapse: collapse; }
 @media screen { body { width: 210mm; min-height: 297mm; margin: 20px auto; padding: 20mm; box-shadow: 0 1px 12px #0002; } }
+.c21-print-header { display: flex; align-items: center; justify-content: space-between; gap: 8mm; min-height: 10mm; margin-bottom: 5mm; }
+.c21-print-header img { display: block; max-width: 48mm; max-height: 12mm; width: auto; height: auto; object-fit: contain; }
 ${styles}
 /* Keep print behavior after legal template styles so the generated watermark and layout rules remain active. */
 @page { size: A4 portrait; margin: 0; }
@@ -73,6 +80,16 @@ ${styles}
     box-decoration-break: clone;
     -webkit-box-decoration-break: clone;
     padding: 18mm 20mm;
+  }
+  .c21-print-document > .c21-print-header {
+    position: fixed;
+    z-index: 2;
+    top: 4mm;
+    right: 20mm;
+    left: 20mm;
+    height: 10mm;
+    min-height: 0;
+    margin: 0;
   }
   .c21-print-document::before,
   .c21-print-document::after { position: fixed; z-index: 0; pointer-events: none; color: #b7a56c; opacity: .14; font-family: Arial, sans-serif; font-weight: 700; }

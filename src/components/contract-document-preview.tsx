@@ -72,7 +72,7 @@ export function ContractDocumentPreview({ contractId, canDownload = true }: { co
         <div className="flex flex-wrap items-center gap-2">
           {htmlDocument && canDownload && <button type="button" className="btn-ghost" onClick={printHtml}>Imprimir / Guardar PDF</button>}
           {canDownload
-            ? <a href={`/api/contratos/${contractId}/document?download=1`} className="btn-ghost">{htmlDocument ? "Descargar HTML" : "Descargar Word"}</a>
+            ? <a href={`/api/contratos/${contractId}/document?download=${htmlDocument ? "word" : "1"}`} className="btn">Descargar Word</a>
             : <p className="text-right text-xs font-medium text-ink-mute dark:text-carbon-400">La descarga estará disponible cuando Legal marque el contrato como firmado.</p>}
         </div>
       </div>
