@@ -10,6 +10,7 @@ import { isAdvisorProfileComplete } from "@/lib/advisor-profile";
 import type { ContractFormOptions } from "@/lib/contract-form-option-defaults";
 import { CorporateSelect } from "./corporate-select";
 import { SubmitButton } from "./submit-button";
+import { compressBrowserImageToWebp } from "@/lib/compress-browser-image";
 
 const fields = [
   { name: "fullName", label: "Nombre legal completo", type: "text", autoComplete: "name", wide: true },
@@ -53,21 +54,17 @@ export function AdvisorProfileForm({ profile, identityCities }: ProfileFormProps
       event.currentTarget.value = "";
       return;
     }
-    if (file.size > 1024 * 1024) {
-      setPhotoError("La foto debe pesar como máximo 1 MB.");
-      event.currentTarget.value = "";
-      return;
-    }
     setUploading(true);
     try {
+      const compressed = await compressBrowserImageToWebp(file);
       const data = new FormData();
-      data.set("file", file);
+      data.set("file", compressed, compressed.name);
       const response = await fetch("/api/profile/avatar", { method: "POST", body: data });
       if (!response.ok) throw new Error((await response.text()) || "No se pudo cargar la foto.");
       const result = await response.json() as { id: string };
       setPhotoId(result.id);
-      setPhotoMimeType(file.type);
-      setPreviewUrl(URL.createObjectURL(file));
+      setPhotoMimeType(compressed.type);
+      setPreviewUrl(URL.createObjectURL(compressed));
     } catch (error) {
       setPhotoError(error instanceof Error ? error.message : "No se pudo cargar la foto.");
     } finally {
@@ -121,7 +118,7 @@ export function AdvisorProfileForm({ profile, identityCities }: ProfileFormProps
                 <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={selectPhoto} />
                 <button type="button" className="btn-ghost" disabled={uploading} onClick={() => fileRef.current?.click()}>{uploading ? "Cargando…" : "Subir foto"}</button>
               </div>
-              <p className="text-xs text-ink-mute dark:text-carbon-400">JPG, PNG o WebP · máximo 1 MB</p>
+              <p className="text-xs text-ink-mute dark:text-carbon-400">JPG, PNG o WebP · se convierte a WebP y se comprime automáticamente a 1 MB o menos</p>
               {photoError && <p role="alert" className="text-sm text-red-600 dark:text-red-300">{photoError}</p>}
             </div>
           </div>

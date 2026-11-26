@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { renderAsync } from "docx-preview";
 
-export function ContractDocumentPreview({ contractId, canDownload = true }: { contractId: string; canDownload?: boolean }) {
+export function ContractDocumentPreview({ contractId, canDownload = true, approved = false }: { contractId: string; canDownload?: boolean; approved?: boolean }) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const styleRef = useRef<HTMLDivElement>(null);
   const htmlFrameRef = useRef<HTMLIFrameElement>(null);
@@ -61,6 +61,24 @@ export function ContractDocumentPreview({ contractId, canDownload = true }: { co
     htmlFrameRef.current?.contentWindow?.print();
   }
 
+  function printWordPreview() {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow || !bodyRef.current || !styleRef.current) return;
+    printWindow.opener = null;
+    printWindow.document.open();
+    printWindow.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Contrato ${contractId}</title>${styleRef.current.innerHTML}<style>@media print{body{margin:0!important;background:#fff!important}.docx-wrapper{padding:0!important;background:#fff!important}}</style></head><body>${bodyRef.current.innerHTML}</body></html>`);
+    printWindow.document.close();
+    window.setTimeout(() => {
+      printWindow.focus();
+      printWindow.print();
+    }, 300);
+  }
+
+  function printDocument() {
+    if (htmlDocument) printHtml();
+    else printWordPreview();
+  }
+
   return (
     <section className="panel overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 px-5 py-4 dark:border-carbon-800 sm:px-6">
@@ -70,12 +88,18 @@ export function ContractDocumentPreview({ contractId, canDownload = true }: { co
           {pageCount !== null && <p className="mt-1 text-xs font-medium text-gold-800 dark:text-gold-300">{pageCount} {pageCount === 1 ? "página" : "páginas"}{htmlDocument ? " · A4 vertical · impresión" : " · formato definido en Word"}</p>}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {htmlDocument && canDownload && <button type="button" className="btn-ghost" onClick={printHtml}>Imprimir / Guardar PDF</button>}
-          {canDownload
-            ? <a href={`/api/contratos/${contractId}/document?download=${htmlDocument ? "word" : "1"}`} className="btn">Descargar Word</a>
-            : <p className="text-right text-xs font-medium text-ink-mute dark:text-carbon-400">La descarga estará disponible cuando Legal marque el contrato como firmado.</p>}
+          {canDownload && approved ? <>
+            <button type="button" className="btn-ghost" onClick={printDocument}>Imprimir</button>
+            <button type="button" className="btn" onClick={printDocument}>Exportar PDF</button>
+          </> : <>
+            {htmlDocument && canDownload && <button type="button" className="btn-ghost" onClick={printHtml}>Imprimir</button>}
+            {canDownload
+              ? <a href={`/api/contratos/${contractId}/document?download=${htmlDocument ? "word" : "1"}`} className="btn">Descargar Word</a>
+              : <p className="text-right text-xs font-medium text-ink-mute dark:text-carbon-400">La descarga estará disponible cuando Legal marque el contrato como firmado.</p>}
+          </>}
         </div>
       </div>
+      {canDownload && approved && <p className="border-b border-stone-100 px-5 py-2 text-xs text-ink-mute dark:border-carbon-800 dark:text-carbon-400 sm:px-6">Para guardar el archivo PDF, selecciona “Guardar como PDF” en el diálogo de impresión.</p>}
       {status && <p className="p-5 text-sm text-ink-mute dark:text-carbon-400">{status}</p>}
       {error && <p role="alert" className="p-5 text-sm text-red-700">{error}</p>}
       {htmlDocument && <div className="max-h-[80vh] overflow-auto bg-stone-100 p-3 dark:bg-carbon-950 sm:p-6">
