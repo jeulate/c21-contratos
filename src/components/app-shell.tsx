@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -44,7 +45,7 @@ export function AppShell({
   logoutAction,
 }: {
   children: React.ReactNode;
-  user: { name: string; username: string; role: Role };
+  user: { name: string; username: string; role: Role; avatarUrl?: string };
   links: AppLink[];
   logoutAction: () => Promise<void>;
 }) {
@@ -106,8 +107,8 @@ export function AppShell({
               <p className="max-w-40 truncate text-sm font-semibold text-ink dark:text-white">{user.name}</p>
               <p className="text-xs text-ink-mute dark:text-carbon-400">{roleName[user.role]}</p>
             </div>
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-gold-200 bg-gold-50 text-xs font-bold text-gold-700 dark:border-gold-500/30 dark:bg-gold-500/10 dark:text-gold-300" aria-label={`Usuario ${user.name}`}>
-              {initials || "C21"}
+            <div className="relative grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full border border-gold-200 bg-gold-50 text-xs font-bold text-gold-700 dark:border-gold-500/30 dark:bg-gold-500/10 dark:text-gold-300" aria-label={`Usuario ${user.name}`}>
+              {user.avatarUrl ? <Image src={user.avatarUrl} alt={`Foto de ${user.name}`} fill sizes="40px" unoptimized className="object-cover" /> : initials || "C21"}
             </div>
             <form action={logoutAction}>
               <button type="submit" className="inline-flex h-10 items-center gap-2 rounded-xl px-2.5 text-sm font-medium text-ink-mute transition hover:bg-stone-100 hover:text-ink dark:text-carbon-400 dark:hover:bg-carbon-800 dark:hover:text-white" aria-label="Cerrar sesión">

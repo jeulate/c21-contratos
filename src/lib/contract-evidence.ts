@@ -20,6 +20,7 @@ const evidenceRoot = () => path.resolve(process.env.CONTRACT_EVIDENCE_DIR ?? pat
 const safeSegment = (value: string) => /^[a-zA-Z0-9._-]{1,80}$/.test(value) && !value.includes("..");
 const extensionFor = (mimeType: ContractEvidence["mimeType"]) => ({ "image/webp": "webp", "image/jpeg": "jpg", "image/png": "png" })[mimeType];
 const supportedMimeTypes: ContractEvidence["mimeType"][] = ["image/webp", "image/jpeg", "image/png"];
+const MAX_ADVISOR_PHOTO_BYTES = 1024 * 1024;
 
 const bunnyRegions: Record<string, string> = {
   de: "storage.bunnycdn.com",
@@ -301,6 +302,33 @@ export async function readContractEvidenceFile(contractId: string, evidence: Con
   const key = `${contractKey(contractId)}/${evidence.id}.${extensionFor(evidence.mimeType)}`;
   if (storageMode() === "bunny") return bunnyRead(key);
   return readFile(path.join(evidenceRoot(), "contracts", contractId, `${evidence.id}.${extensionFor(evidence.mimeType)}`));
+}
+
+function advisorPhotoKey(username: string, id: string, mimeType: ContractEvidence["mimeType"]) {
+  if (!safeSegment(username) || !isEvidenceIdentifier(id) || !supportedMimeTypes.includes(mimeType)) {
+    throw new Error("Identificador de foto de perfil inválido.");
+  }
+  return `advisors/${username.toLowerCase()}/${id}.${extensionFor(mimeType)}`;
+}
+
+export async function saveAdvisorProfilePhoto(username: string, id: string, mimeType: ContractEvidence["mimeType"], bytes: Buffer) {
+  if (!supportedMimeTypes.includes(mimeType) || bytes.byteLength === 0 || bytes.byteLength > MAX_ADVISOR_PHOTO_BYTES) {
+    throw new Error("La foto debe ser JPG, PNG o WebP y pesar como máximo 1 MB.");
+  }
+  const key = advisorPhotoKey(username, id, mimeType);
+  if (storageMode() === "bunny") {
+    await bunnyPut(key, bytes);
+    return;
+  }
+  const filePath = path.join(evidenceRoot(), ...key.split("/"));
+  await mkdir(path.dirname(filePath), { recursive: true, mode: 0o700 });
+  await writeFile(filePath, bytes, { flag: "wx", mode: 0o600 });
+}
+
+export async function readAdvisorProfilePhoto(username: string, id: string, mimeType: ContractEvidence["mimeType"]) {
+  const key = advisorPhotoKey(username, id, mimeType);
+  if (storageMode() === "bunny") return bunnyRead(key);
+  return readFile(path.join(evidenceRoot(), ...key.split("/")));
 }
 
 async function cleanupExpiredStaging(username: string) {
