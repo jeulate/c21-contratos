@@ -46,7 +46,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
       <div className="grid gap-5 xl:grid-cols-2">
         {(s.role === "legal" || s.role === "admin") && <div className="space-y-5">
           <ContractStatePanel id={c.id} currentState={c.estado} allowedStates={allowedContractTransitions(c.estado)} />
-          {c.templateVersionId && <ContractDocumentPreview contractId={c.id} canDownload approved={c.estado === "firmado"} />}
+          {c.templateVersionId && <ContractDocumentPreview contractId={c.id} canDownload />}
           {!c.templateVersionId && <section className="panel p-5">
             <h2 className="text-sm font-semibold text-ink dark:text-white">Vista previa Word</h2>
             <p className="mt-1 text-sm text-ink-mute dark:text-carbon-400">Este contrato no tiene una plantilla Word versionada asociada.</p>
@@ -55,7 +55,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
         {s.role === "asesor" && c.estado === "firmado" ? <>
           <div className="space-y-5">
             {c.templateVersionId
-              ? <ContractDocumentPreview contractId={c.id} canDownload approved />
+              ? <ContractDocumentPreview contractId={c.id} canDownload />
               : <section className="panel p-5">
                 <h2 className="text-sm font-semibold text-ink dark:text-white">Contrato aprobado y firmado</h2>
                 <p className="mt-1 text-sm text-ink-mute dark:text-carbon-400">No hay una plantilla Word versionada asociada a este contrato para mostrar o descargar el documento.</p>

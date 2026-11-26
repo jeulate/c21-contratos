@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { renderAsync } from "docx-preview";
 
-export function ContractDocumentPreview({ contractId, canDownload = true, approved = false }: { contractId: string; canDownload?: boolean; approved?: boolean }) {
+export function ContractDocumentPreview({ contractId, canDownload = true }: { contractId: string; canDownload?: boolean }) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const styleRef = useRef<HTMLDivElement>(null);
   const htmlFrameRef = useRef<HTMLIFrameElement>(null);
@@ -88,18 +88,14 @@ export function ContractDocumentPreview({ contractId, canDownload = true, approv
           {pageCount !== null && <p className="mt-1 text-xs font-medium text-gold-800 dark:text-gold-300">{pageCount} {pageCount === 1 ? "página" : "páginas"}{htmlDocument ? " · A4 vertical · impresión" : " · formato definido en Word"}</p>}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {canDownload && approved ? <>
+          {canDownload && !status && !error && <>
             <button type="button" className="btn-ghost" onClick={printDocument}>Imprimir</button>
-            <button type="button" className="btn" onClick={printDocument}>Exportar PDF</button>
-          </> : <>
-            {htmlDocument && canDownload && <button type="button" className="btn-ghost" onClick={printHtml}>Imprimir</button>}
-            {canDownload
-              ? <a href={`/api/contratos/${contractId}/document?download=${htmlDocument ? "word" : "1"}`} className="btn">Descargar Word</a>
-              : <p className="text-right text-xs font-medium text-ink-mute dark:text-carbon-400">La descarga estará disponible cuando Legal marque el contrato como firmado.</p>}
+            <button type="button" className="btn" onClick={printDocument}>Descargar PDF</button>
           </>}
+          {!canDownload && <p className="text-right text-xs font-medium text-ink-mute dark:text-carbon-400">La descarga estará disponible cuando Legal marque el contrato como firmado.</p>}
         </div>
       </div>
-      {canDownload && approved && <p className="border-b border-stone-100 px-5 py-2 text-xs text-ink-mute dark:border-carbon-800 dark:text-carbon-400 sm:px-6">Para guardar el archivo PDF, selecciona “Guardar como PDF” en el diálogo de impresión.</p>}
+      {canDownload && !status && !error && <p className="border-b border-stone-100 px-5 py-2 text-xs text-ink-mute dark:border-carbon-800 dark:text-carbon-400 sm:px-6">Para descargarlo como PDF, selecciona “Guardar como PDF” en el diálogo de impresión.</p>}
       {status && <p className="p-5 text-sm text-ink-mute dark:text-carbon-400">{status}</p>}
       {error && <p role="alert" className="p-5 text-sm text-red-700">{error}</p>}
       {htmlDocument && <div className="max-h-[80vh] overflow-auto bg-stone-100 p-3 dark:bg-carbon-950 sm:p-6">
