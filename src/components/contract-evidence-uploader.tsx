@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import Image from "next/image";
-import { MAX_CONTRACT_EVIDENCE_BYTES, MAX_CONTRACT_EVIDENCE_IMAGES, MIN_CONTRACT_EVIDENCE_IMAGES } from "@/lib/contract-evidence-constants";
+import { MAX_CONTRACT_EVIDENCE_IMAGES, MIN_CONTRACT_EVIDENCE_IMAGES } from "@/lib/contract-evidence-constants";
+import { compressBrowserImageToWebp } from "@/lib/compress-browser-image";
 
 type UploadItem = {
   id: string;
@@ -17,36 +18,6 @@ type UploadItem = {
 
 const MAX_ORIGINAL_BYTES = 20 * 1024 * 1024;
 const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
-
-async function compressImage(source: File) {
-  const bitmap = await createImageBitmap(source);
-  try {
-    for (const maxDimension of [1920, 1600, 1280]) {
-      const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-      const context = canvas.getContext("2d");
-      if (!context) throw new Error("El navegador no pudo preparar la imagen.");
-      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-
-      for (const quality of [0.82, 0.72, 0.62, 0.52]) {
-        const blob = await new Promise<Blob>((resolve, reject) => {
-          canvas.toBlob((value) => value ? resolve(value) : reject(new Error("No se pudo comprimir la imagen.")), "image/webp", quality);
-        });
-        if (blob.size <= MAX_CONTRACT_EVIDENCE_BYTES && allowedTypes.has(blob.type)) {
-          const extension = blob.type === "image/jpeg" ? "jpg" : blob.type.split("/")[1];
-          const baseName = source.name.replace(/\.[^.]+$/, "").slice(0, 100) || "respaldo";
-          return new File([blob], `${baseName}.${extension}`, { type: blob.type, lastModified: Date.now() });
-        }
-      }
-    }
-    throw new Error("No se pudo reducir la imagen a 1 MB. Prueba con otra imagen.");
-  } finally {
-    bitmap.close();
-  }
-}
-
 export function ContractEvidenceUploader({
   sessionId,
   onChange,
@@ -101,7 +72,7 @@ export function ContractEvidenceUploader({
 
   async function processItem(item: UploadItem, source: File) {
     try {
-      const compressed = await compressImage(source);
+      const compressed = await compressBrowserImageToWebp(source);
       const previewUrl = URL.createObjectURL(compressed);
       setItems((current) => current.map((existing) => {
         if (existing.id !== item.id) return existing;

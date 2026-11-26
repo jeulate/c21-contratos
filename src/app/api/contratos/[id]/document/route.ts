@@ -73,6 +73,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!contract || (!isStaff(session) && contract.asesor !== session.username)) return new NextResponse("Contrato no encontrado", { status: 404 });
   const download = new URL(request.url).searchParams.has("download");
   const requestedFormat = new URL(request.url).searchParams.get("download");
+  if (download && contract.estado === "firmado") {
+    return new NextResponse("Los contratos firmados se imprimen o se guardan como PDF desde la vista previa.", { status: 403 });
+  }
   if (download && session.role === "asesor" && contract.estado !== "firmado") {
     return new NextResponse("La descarga estará disponible cuando el contrato se encuentre firmado.", { status: 403 });
   }
