@@ -62,7 +62,7 @@ export function AppShell({
           <span className="grid h-10 w-10 place-items-center rounded-xl bg-gold-500 text-sm font-bold tracking-tight text-white shadow-sm">C21</span>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-ink dark:text-white">Contratos</p>
-            <p className="text-xs text-ink-mute dark:text-carbon-400">Century 21 · local</p>
+            <p className="text-xs text-ink-mute dark:text-carbon-400">Gestión de contratos</p>
           </div>
           <button onClick={() => setMobileOpen(false)} className="ml-auto rounded-lg p-2 text-ink-mute hover:bg-stone-100 dark:hover:bg-carbon-800 lg:hidden" aria-label="Cerrar menú">
             <span className="text-xl leading-none">×</span>
@@ -89,13 +89,6 @@ export function AppShell({
           })}
         </nav>
 
-        <div className="m-4 rounded-2xl border border-gold-100 bg-gold-50/70 p-4 dark:border-carbon-700 dark:bg-carbon-800/70">
-          <div className="mb-2 flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 ring-4 ring-emerald-500/10" />
-            <span className="text-xs font-semibold text-ink dark:text-carbon-200">Entorno de desarrollo</span>
-          </div>
-          <p className="text-xs leading-5 text-ink-mute dark:text-carbon-400">Los datos de prueba se guardan en Redis local.</p>
-        </div>
       </aside>
 
       <div className="min-w-0 flex-1">

@@ -13,6 +13,7 @@ import { activateTemplateVersion, createTemplateVersion, deleteTemplateVersion, 
 import { getContractCurrency, setContractCurrency } from "@/lib/contract-currencies";
 import { setContractFormOptions } from "@/lib/contract-form-options";
 import { setContractPrintSettings } from "@/lib/contract-print-settings";
+import { setDashboardExchangeRate } from "@/lib/dashboard-settings";
 import type { CountryCallingCode } from "@/lib/contract-form-option-defaults";
 import { validateHtmlTemplateMarkers } from "@/lib/contract-html-document";
 import { finalizeStagedContractEvidence, isEvidenceIdentifier, MIN_CONTRACT_EVIDENCE_IMAGES, MAX_CONTRACT_EVIDENCE_IMAGES, removeContractEvidenceFiles } from "@/lib/contract-evidence";
@@ -167,6 +168,23 @@ export async function saveContractCurrencyAction(_: FormState, fd: FormData): Pr
   revalidatePath("/configuracion-contratos");
   revalidatePath("/contratos/nuevo");
   return { ok: `Divisa ${parsed.data.moneda} guardada para ${CONTRACT_TYPES.find((item) => item.id === parsed.data.tipo)?.label}.` };
+}
+
+export async function saveDashboardExchangeRateAction(_: FormState, fd: FormData): Promise<FormState> {
+  await requireSession(["admin"]);
+  const parsed = z.object({
+    exchangeRate: z.coerce.number().finite().positive("El tipo de cambio debe ser mayor que cero.").max(1_000_000, "El tipo de cambio supera el límite permitido."),
+  }).safeParse(Object.fromEntries(fd));
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  try {
+    await setDashboardExchangeRate(parsed.data.exchangeRate);
+    revalidatePath("/configuracion-contratos");
+    revalidatePath("/dashboard");
+    return { ok: "Tipo de cambio guardado. El dashboard ya usa el nuevo valor." };
+  } catch (error) {
+    return { error: `No se pudo guardar el tipo de cambio: ${(error as Error).message}` };
+  }
 }
 
 function parseFormOptionList(value: string, label: string) {
