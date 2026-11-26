@@ -3,6 +3,7 @@ import Redis from "ioredis";
 import bcrypt from "bcryptjs";
 
 const redis = new Redis(process.env.REDIS_URL ?? "redis://127.0.0.1:6379", {
+  keyPrefix: process.env.REDIS_KEY_PREFIX ?? "c21-contratos:",
   maxRetriesPerRequest: 1,
   retryStrategy: (attempt) => Math.min(attempt * 250, 2_000),
 });
