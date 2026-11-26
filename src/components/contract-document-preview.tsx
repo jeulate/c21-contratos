@@ -125,7 +125,7 @@ export function ContractDocumentPreview({ contractId, canDownload = true }: { co
       pdfRoot = document.createElement("div");
       pdfRoot.className = "c21-pdf-export";
       Object.assign(pdfRoot.style, {
-        position: "fixed",
+        position: "absolute",
         top: "0",
         left: "0",
         width: "210mm",
@@ -134,6 +134,7 @@ export function ContractDocumentPreview({ contractId, canDownload = true }: { co
         overflow: "visible",
         background: "#fff",
         color: "#111",
+        opacity: "0",
         zIndex: "-1",
       });
 
@@ -172,7 +173,22 @@ export function ContractDocumentPreview({ contractId, canDownload = true }: { co
         margin: 0,
         filename: `contrato-${contractId.replace(/[^a-zA-Z0-9_-]/g, "-")}.pdf`,
         image: { type: "jpeg" as const, quality: 0.98 },
-        html2canvas: { scale, useCORS: true, allowTaint: false, backgroundColor: "#ffffff", logging: false },
+        html2canvas: {
+          scale,
+          useCORS: true,
+          allowTaint: false,
+          backgroundColor: "#ffffff",
+          logging: false,
+          onclone: (clonedDocument: Document) => {
+            const clonedRoot = clonedDocument.querySelector<HTMLElement>(".html2pdf__container .c21-pdf-export");
+            if (!clonedRoot) return;
+            clonedRoot.style.position = "relative";
+            clonedRoot.style.top = "auto";
+            clonedRoot.style.left = "auto";
+            clonedRoot.style.opacity = "1";
+            clonedRoot.style.zIndex = "auto";
+          },
+        },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" as const },
         pagebreak: { mode: ["css", "legacy"] },
       };
