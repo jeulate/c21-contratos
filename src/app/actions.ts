@@ -7,6 +7,7 @@ import { z } from "zod";
 import { requireSession, isStaff } from "@/lib/auth";
 import { COOKIE, signSession, Role } from "@/lib/session";
 import { AdvisorProfile, checkPassword, createUser, getUser, patchUser } from "@/lib/users";
+import { isAdvisorProfileComplete } from "@/lib/advisor-profile";
 import { CONTRACT_TYPES, CURRENCIES, isTemplateBasedContract, STATES } from "@/lib/contract-types";
 import { changeContractState, ContractInput, createContract, getContract, listContracts, markSignedContractNotificationAsRead, updateContract, validateAdditionalOwners, validateExtras } from "@/lib/contracts";
 import { activateTemplateVersion, createTemplateVersion, deleteTemplateVersion, getActiveTemplate, getTemplateVersion, listTemplateVersions } from "@/lib/contract-templates";
@@ -16,12 +17,12 @@ import { setContractPrintSettings } from "@/lib/contract-print-settings";
 import { setDashboardExchangeRate } from "@/lib/dashboard-settings";
 import type { CountryCallingCode } from "@/lib/contract-form-option-defaults";
 import { validateHtmlTemplateMarkers } from "@/lib/contract-html-document";
-import { finalizeStagedContractEvidence, isEvidenceIdentifier, MIN_CONTRACT_EVIDENCE_IMAGES, MAX_CONTRACT_EVIDENCE_IMAGES, removeContractEvidenceFiles } from "@/lib/contract-evidence";
+import { finalizeStagedContractEvidence, isEvidenceIdentifier, MIN_CONTRACT_EVIDENCE_IMAGES, MAX_CONTRACT_EVIDENCE_IMAGES, removeContractEvidenceFiles, readAdvisorProfilePhoto } from "@/lib/contract-evidence";
 import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
 import InspectModule from "docxtemplater/js/inspect-module.js";
 
-export type FormState = { error?: string; ok?: string };
+export type FormState = { error?: string; ok?: string; revision?: string };
 
 /* ---------- Sesión ---------- */
 export async function login(_: FormState, fd: FormData): Promise<FormState> {
@@ -86,11 +87,13 @@ export async function saveContract(id: string | null, _: FormState, fd: FormData
   if (validatedAdditionalOwners.error) return { error: validatedAdditionalOwners.error };
 
   let templateVersionId: string | undefined;
-  let creator = await getUser(session.username);
+  const creator = await getUser(session.username);
+  if (!id && session.role === "asesor" && !isAdvisorProfileComplete(creator?.advisorProfile)) {
+    return { error: "Completa primero tu perfil de asesor para crear un contrato." };
+  }
   if (isTemplateBasedContract(parsed.data.tipo)) {
     if (session.role !== "asesor") return { error: "Los modelos de exclusividad solo pueden registrarse desde una cuenta de asesor." };
-    const profile = creator?.advisorProfile;
-    if (!profile) return { error: "Completa primero tu perfil de asesor para usar esta plantilla." };
+    if (!isAdvisorProfileComplete(creator?.advisorProfile)) return { error: "Completa primero tu perfil de asesor para usar esta plantilla." };
     const activeTemplate = await getActiveTemplate(parsed.data.tipo);
     if (!activeTemplate) return { error: "Legal todavía no activó una plantilla Word para este tipo de contrato." };
     templateVersionId = activeTemplate.id;
@@ -309,16 +312,38 @@ export async function saveAdvisorProfile(_: FormState, fd: FormData): Promise<Fo
       mobile: z.string().trim().min(6, "Indica el teléfono móvil"),
       whatsapp: z.string().trim().min(6, "Indica el WhatsApp"),
       email: z.string().trim().email("Indica un correo válido"),
+      photoId: z.string().trim().optional(),
+      photoMimeType: z.string().optional(),
     })
     .safeParse(Object.fromEntries(fd));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const user = await getUser(session.username);
   if (!user) return { error: "No se encontró la cuenta del asesor" };
-  const profile: AdvisorProfile = { ...parsed.data, updatedAt: new Date().toISOString() };
+  const { photoId, photoMimeType, ...fields } = parsed.data;
+  if (photoId && !/^[a-f0-9-]{36}$/i.test(photoId)) return { error: "La foto seleccionada no es válida. Vuelve a cargarla." };
+  if (photoId && !["image/webp", "image/jpeg", "image/png"].includes(photoMimeType ?? "")) return { error: "No se pudo verificar el formato de la foto. Vuelve a cargarla." };
+  const savedPhotoId = photoId || user.advisorProfile?.photoId;
+  const savedPhotoMimeType = photoId ? photoMimeType : user.advisorProfile?.photoMimeType;
+  if (!savedPhotoId || !savedPhotoMimeType) return { error: "Carga una foto de perfil antes de guardar tus datos." };
+  if (savedPhotoId && savedPhotoMimeType) {
+    try {
+      await readAdvisorProfilePhoto(session.username, savedPhotoId, savedPhotoMimeType as NonNullable<AdvisorProfile["photoMimeType"]>);
+    } catch {
+      return { error: "No se encontró la foto cargada. Vuelve a seleccionarla antes de guardar." };
+    }
+  }
+  const profile: AdvisorProfile = {
+    ...fields,
+    photoId: savedPhotoId,
+    photoMimeType: savedPhotoMimeType as NonNullable<AdvisorProfile["photoMimeType"]>,
+    updatedAt: new Date().toISOString(),
+  };
   await patchUser(session.username, { advisorProfile: profile });
   revalidatePath("/perfil");
-  return { ok: "Perfil guardado" };
+  revalidatePath("/contratos/nuevo");
+  revalidatePath("/", "layout");
+  return { ok: "Perfil guardado", revision: crypto.randomUUID() };
 }
 
 export async function changeContractStateAction(id: string, _: FormState, fd: FormData): Promise<FormState> {

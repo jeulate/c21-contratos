@@ -1,6 +1,7 @@
 import { AppShell } from "@/components/app-shell";
 import { requireSession, isStaff } from "@/lib/auth";
 import { logout } from "../actions";
+import { getUser } from "@/lib/users";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await requireSession();
@@ -13,10 +14,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     ...(session.role === "admin" ? [{ href: "/configuracion-contratos", label: "Configuración de contratos", icon: "contracts" as const }] : []),
     ...(session.role === "admin" ? [{ href: "/usuarios", label: "Usuarios", icon: "users" as const }] : []),
   ];
+  const advisor = session.role === "asesor" ? await getUser(session.username) : null;
 
   return (
     <AppShell
-      user={{ name: session.name, username: session.username, role: session.role }}
+      user={{ name: session.name, username: session.username, role: session.role, avatarUrl: advisor?.advisorProfile?.photoId ? `/api/profile/avatar?id=${encodeURIComponent(advisor.advisorProfile.photoId)}` : undefined }}
       links={links}
       logoutAction={logout}
     >
