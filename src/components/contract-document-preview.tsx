@@ -120,6 +120,7 @@ export function ContractDocumentPreview({ contractId, canDownload = true }: { co
     setDownloadingPdf(true);
     setError("");
     let pdfRoot: HTMLDivElement | null = null;
+    const headerLogos: Array<{ data: string; side: "left" | "right"; aspectRatio: number }> = [];
     try {
       const html2pdf = (await import("html2pdf.js")).default;
       pdfRoot = document.createElement("div");
@@ -144,7 +145,10 @@ export function ContractDocumentPreview({ contractId, canDownload = true }: { co
         const style = document.createElement("style");
         style.textContent = Array.from(sourceDocument.styleSheets).map((sheet) => {
           try { return collectPdfCssRules(sheet.cssRules); } catch { return ""; }
-        }).join("\n");
+        }).join("\n") + `
+          .c21-pdf-export .c21-print-document { padding-top: 0 !important; padding-bottom: 0 !important; }
+          .c21-pdf-export .c21-print-document > .c21-print-header { display: none !important; }
+        `;
         pdfRoot.appendChild(style);
         const watermark = sourceDocument.body.querySelector(".c21-print-watermark")?.cloneNode(true);
         if (watermark) pdfRoot.appendChild(watermark);
@@ -168,9 +172,26 @@ export function ContractDocumentPreview({ contractId, canDownload = true }: { co
         }
       }));
 
+      if (htmlDocument) {
+        for (const image of Array.from(pdfRoot.querySelectorAll<HTMLImageElement>(".c21-print-header img"))) {
+          if (!image.complete || image.naturalWidth === 0 || image.naturalHeight === 0) continue;
+          const canvas = document.createElement("canvas");
+          canvas.width = image.naturalWidth;
+          canvas.height = image.naturalHeight;
+          const context = canvas.getContext("2d");
+          if (!context) continue;
+          context.drawImage(image, 0, 0);
+          headerLogos.push({
+            data: canvas.toDataURL("image/png"),
+            side: image.classList.contains("c21-print-header__right") ? "right" : "left",
+            aspectRatio: image.naturalWidth / image.naturalHeight,
+          });
+        }
+      }
+
       const scale = Math.max(1, Math.min(2, Math.sqrt(24_000_000 / Math.max(1, pdfRoot.scrollWidth * pdfRoot.scrollHeight))));
       const options = {
-        margin: 0,
+        margin: [22, 0, 20, 0] as [number, number, number, number],
         filename: `contrato-${contractId.replace(/[^a-zA-Z0-9_-]/g, "-")}.pdf`,
         image: { type: "jpeg" as const, quality: 0.98 },
         html2canvas: {
@@ -190,9 +211,22 @@ export function ContractDocumentPreview({ contractId, canDownload = true }: { co
           },
         },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" as const },
-        pagebreak: { mode: ["css", "legacy"] },
+        pagebreak: { mode: ["css", "legacy"], avoid: ["p", "li", "tr", "img"] },
       };
-      await html2pdf().set(options).from(pdfRoot).save();
+      const worker = html2pdf().set(options).from(pdfRoot);
+      await worker.toPdf();
+      const pdf = await worker.get("pdf");
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      for (let page = 1; page <= pdf.getNumberOfPages(); page++) {
+        pdf.setPage(page);
+        for (const logo of headerLogos) {
+          const width = Math.min(48, 12 * logo.aspectRatio);
+          const height = width / logo.aspectRatio;
+          const x = logo.side === "left" ? 20 : pageWidth - 20 - width;
+          pdf.addImage(logo.data, "PNG", x, 5, width, height);
+        }
+      }
+      await worker.save();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No se pudo generar el archivo PDF.");
     } finally {
