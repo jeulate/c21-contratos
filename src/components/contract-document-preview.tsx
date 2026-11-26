@@ -146,7 +146,37 @@ export function ContractDocumentPreview({ contractId, canDownload = true }: { co
         style.textContent = Array.from(sourceDocument.styleSheets).map((sheet) => {
           try { return collectPdfCssRules(sheet.cssRules); } catch { return ""; }
         }).join("\n") + `
-          .c21-pdf-export .c21-print-document { padding-top: 0 !important; padding-bottom: 0 !important; }
+          .c21-pdf-export .c21-print-document {
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            line-height: 1.5 !important;
+            text-align: justify !important;
+            overflow: visible !important;
+          }
+          .c21-pdf-export .c21-print-document p,
+          .c21-pdf-export .c21-print-document li,
+          .c21-pdf-export .c21-print-document td,
+          .c21-pdf-export .c21-print-document th,
+          .c21-pdf-export .c21-print-document blockquote {
+            line-height: 1.5 !important;
+            text-align: justify !important;
+            margin-block-start: 0 !important;
+            margin-block-end: 1.5em !important;
+            break-inside: avoid-page !important;
+            page-break-inside: avoid !important;
+            orphans: 3;
+            widows: 3;
+          }
+          .c21-pdf-export .c21-print-document h1,
+          .c21-pdf-export .c21-print-document h2,
+          .c21-pdf-export .c21-print-document h3,
+          .c21-pdf-export .c21-print-document h4,
+          .c21-pdf-export .c21-print-document h5,
+          .c21-pdf-export .c21-print-document h6 {
+            line-height: 1.5 !important;
+            break-after: avoid-page !important;
+            page-break-after: avoid !important;
+          }
           .c21-pdf-export .c21-print-document > .c21-print-header { display: none !important; }
         `;
         pdfRoot.appendChild(style);
@@ -211,7 +241,7 @@ export function ContractDocumentPreview({ contractId, canDownload = true }: { co
           },
         },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" as const },
-        pagebreak: { mode: ["css", "legacy"], avoid: ["p", "li", "tr", "img"] },
+        pagebreak: { mode: ["css", "legacy"], avoid: ["p", "li", "tr", "img", "h1", "h2", "h3", "h4", "h5", "h6"] },
       };
       const worker = html2pdf().set(options).from(pdfRoot);
       await worker.toPdf();
@@ -220,10 +250,11 @@ export function ContractDocumentPreview({ contractId, canDownload = true }: { co
       for (let page = 1; page <= pdf.getNumberOfPages(); page++) {
         pdf.setPage(page);
         for (const logo of headerLogos) {
-          const width = Math.min(48, 12 * logo.aspectRatio);
+          const maxWidth = logo.side === "left" ? 46 : 12;
+          const width = Math.min(maxWidth, 11 * logo.aspectRatio);
           const height = width / logo.aspectRatio;
           const x = logo.side === "left" ? 20 : pageWidth - 20 - width;
-          pdf.addImage(logo.data, "PNG", x, 5, width, height);
+          pdf.addImage(logo.data, "PNG", x, 7, width, height);
         }
       }
       await worker.save();
