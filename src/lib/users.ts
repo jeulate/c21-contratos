@@ -20,6 +20,8 @@ export type AdvisorProfile = {
   mobile: string;
   whatsapp: string;
   email: string;
+  photoId?: string;
+  photoMimeType?: "image/webp" | "image/jpeg" | "image/png";
   updatedAt: string;
 };
 
