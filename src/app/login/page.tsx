@@ -28,7 +28,7 @@ export default function LoginPage() {
           <p className="mt-5 max-w-lg text-base leading-7 text-ink-soft dark:text-carbon-300">Administra contratos, acompaña cada etapa y mantén la información del equipo organizada desde un solo panel.</p>
           <div className="mt-10 flex items-center gap-3 text-sm text-ink-mute dark:text-carbon-400"><span className="h-px w-10 bg-gold-600" /> Plataforma interna de gestión</div>
         </div>
-        <p className="relative text-xs text-ink-mute dark:text-carbon-500">Entorno local de desarrollo · C21 Contratos</p>
+        <p className="relative text-xs text-ink-mute dark:text-carbon-500">Century 21 · Gestión de contratos</p>
       </section>
 
       <section className="flex min-h-screen items-center justify-center px-5 py-24 sm:px-10 lg:px-12">

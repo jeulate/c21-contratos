@@ -6,10 +6,12 @@ import { getContractFormOptions } from "@/lib/contract-form-options";
 import { ContractFormOptionSettings } from "@/components/contract-form-option-settings";
 import { ContractPrintSettingsForm } from "@/components/contract-print-settings-form";
 import { getContractPrintSettings } from "@/lib/contract-print-settings";
+import { getDashboardExchangeRate } from "@/lib/dashboard-settings";
+import { DashboardExchangeRateForm } from "@/components/dashboard-exchange-rate-form";
 
 export default async function ContractSettingsPage() {
   await requireSession(["admin"]);
-  const [currencies, formOptions, printSettings] = await Promise.all([getContractCurrencies(), getContractFormOptions(), getContractPrintSettings()]);
+  const [currencies, formOptions, printSettings, exchangeRate] = await Promise.all([getContractCurrencies(), getContractFormOptions(), getContractPrintSettings(), getDashboardExchangeRate()]);
 
   return (
     <div className="space-y-5 sm:space-y-6">
@@ -23,6 +25,7 @@ export default async function ContractSettingsPage() {
         La divisa inicial es BOB (Bolivianos). El cambio aplica a contratos nuevos y no convierte montos ni modifica documentos ya creados.
       </div>
       <ContractCurrencySettings types={CONTRACT_TYPES} currencies={CURRENCIES} values={currencies} />
+      <DashboardExchangeRateForm exchangeRate={exchangeRate} />
       <ContractFormOptionSettings options={formOptions} />
       <ContractPrintSettingsForm settings={printSettings} />
     </div>
