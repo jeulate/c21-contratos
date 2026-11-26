@@ -38,6 +38,45 @@ function collectPdfCssRules(rules: CSSRuleList): string {
   return css;
 }
 
+function preparePdfContractAlignment(contract: HTMLElement) {
+  const textBlocks = Array.from(contract.querySelectorAll<HTMLElement>(
+    "h1,h2,h3,h4,h5,h6,p,li,td,th,blockquote,div",
+  )).filter((element) => {
+    const hasBlockChild = element.querySelector("h1,h2,h3,h4,h5,h6,p,li,td,th,blockquote");
+    const hasDirectText = Array.from(element.childNodes).some(
+      (node) => node.nodeType === Node.TEXT_NODE && Boolean(node.textContent?.trim()),
+    );
+    return !hasBlockChild || hasDirectText;
+  });
+  const normalizedText = (element: HTMLElement) => (element.innerText || element.textContent || "").replace(/\s+/g, " ").trim();
+
+  const title = textBlocks.find((element) =>
+    /^CONTRATO\b/i.test(normalizedText(element)) && normalizedText(element).length < 180,
+  );
+  title?.classList.add("c21-pdf-contract-title");
+
+  const explicitSignatureBlocks = contract.querySelectorAll<HTMLElement>(
+    ".c21-contract-signatures,[data-c21-signatures]",
+  );
+  explicitSignatureBlocks.forEach((element) => element.classList.add("c21-pdf-signature-block"));
+
+  const hasExplicitSignatures = explicitSignatureBlocks.length > 0;
+  if (!hasExplicitSignatures) {
+    const signatureStart = textBlocks.findIndex((element) =>
+      /^(?:EL|LA)\s+(?:PROPIETARIO|PROPIETARIA|ASESOR|ASESORA)\s*[:.-]?\s*_*$/i.test(normalizedText(element)),
+    );
+    if (signatureStart >= 0) {
+      for (const element of textBlocks.slice(signatureStart)) {
+        element.classList.add("c21-pdf-signature-block");
+      }
+      const dateBlock = textBlocks.slice(0, signatureStart).reverse().find((element) =>
+        /\b\d{1,2}\s+de\s+[a-záéíóú]+\s+de\s+\d{4}\b/i.test(normalizedText(element)),
+      );
+      dateBlock?.classList.add("c21-pdf-signature-block");
+    }
+  }
+}
+
 export function ContractDocumentPreview({ contractId, canDownload = true }: { contractId: string; canDownload?: boolean }) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const styleRef = useRef<HTMLDivElement>(null);
@@ -177,6 +216,13 @@ export function ContractDocumentPreview({ contractId, canDownload = true }: { co
             break-after: avoid-page !important;
             page-break-after: avoid !important;
           }
+          .c21-pdf-export .c21-print-document .c21-pdf-contract-title {
+            text-align: center !important;
+          }
+          .c21-pdf-export .c21-print-document .c21-pdf-signature-block,
+          .c21-pdf-export .c21-print-document .c21-pdf-signature-block * {
+            text-align: center !important;
+          }
           .c21-pdf-export .c21-print-document > .c21-print-header { display: none !important; }
         `;
         pdfRoot.appendChild(style);
@@ -184,6 +230,7 @@ export function ContractDocumentPreview({ contractId, canDownload = true }: { co
         if (watermark) pdfRoot.appendChild(watermark);
         const main = sourceDocument.body.querySelector(".c21-print-document")?.cloneNode(true);
         if (!main) throw new Error("No se encontró el contenido del contrato para generar el PDF.");
+        preparePdfContractAlignment(main as HTMLElement);
         pdfRoot.appendChild(main);
       } else {
         if (!bodyRef.current || !styleRef.current) throw new Error("La vista previa Word todavía no está lista.");
