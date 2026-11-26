@@ -3,6 +3,7 @@ import { requireSession } from "@/lib/auth";
 import { buildStats, listContracts } from "@/lib/contracts";
 import { stateLabel, typeLabel } from "@/lib/contract-types";
 import { StateBadge } from "@/components/badge";
+import { getDashboardExchangeRate } from "@/lib/dashboard-settings";
 
 function Bars({ title, data, label }: { title: string; data: [string, number][]; label?: (key: string) => string }) {
   const max = Math.max(1, ...data.map((item) => item[1]));
@@ -40,6 +41,9 @@ export default async function Dashboard() {
   const session = await requireSession(["admin", "administrativo", "legal"]);
   const contracts = await listContracts();
   const stats = buildStats(contracts);
+  const exchangeRate = await getDashboardExchangeRate();
+  const signedAmountBOB = stats.montoFirmado.BOB + stats.montoFirmado.USD * exchangeRate;
+  const signedAmountUSD = signedAmountBOB / exchangeRate;
   const pendingLegal = session.role === "legal"
     ? contracts.filter((contract) => contract.estado === "revision").sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     : [];
@@ -47,7 +51,7 @@ export default async function Dashboard() {
     { label: "Contratos registrados", value: stats.total },
     { label: "Firmados este mes", value: stats.firmadosMes },
     { label: "En revisión", value: stats.enRevision },
-    { label: "Monto firmado", value: `USD ${stats.montoFirmado.USD.toLocaleString("es-BO")}`, sub: `BOB ${stats.montoFirmado.BOB.toLocaleString("es-BO")}` },
+    { label: "Monto firmado", value: `Bs. ${signedAmountBOB.toLocaleString("es-BO", { maximumFractionDigits: 2 })}`, sub: `USD ${signedAmountUSD.toLocaleString("es-BO", { maximumFractionDigits: 2 })} · T.C. ${exchangeRate.toLocaleString("es-BO", { maximumFractionDigits: 4 })} Bs./USD` },
   ];
 
   return (
