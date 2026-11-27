@@ -39,16 +39,10 @@ function collectPdfCssRules(rules: CSSRuleList): string {
 }
 
 function preparePdfContractAlignment(contract: HTMLElement) {
-  const textBlocks = Array.from(contract.querySelectorAll<HTMLElement>(
-    "h1,h2,h3,h4,h5,h6,p,li,td,th,blockquote,div",
-  )).filter((element) => {
-    const hasBlockChild = element.querySelector("h1,h2,h3,h4,h5,h6,p,li,td,th,blockquote");
-    const hasDirectText = Array.from(element.childNodes).some(
-      (node) => node.nodeType === Node.TEXT_NODE && Boolean(node.textContent?.trim()),
-    );
-    return !hasBlockChild || hasDirectText;
-  });
   const normalizedText = (element: HTMLElement) => (element.innerText || element.textContent || "").replace(/\s+/g, " ").trim();
+  const textBlocks = Array.from(contract.querySelectorAll<HTMLElement>(
+    "h1,h2,h3,h4,h5,h6,p,li,td,th,blockquote",
+  ));
 
   const title = textBlocks.find((element) =>
     /^CONTRATO\b/i.test(normalizedText(element)) && normalizedText(element).length < 180,
@@ -62,17 +56,47 @@ function preparePdfContractAlignment(contract: HTMLElement) {
 
   const hasExplicitSignatures = explicitSignatureBlocks.length > 0;
   if (!hasExplicitSignatures) {
-    const signatureStart = textBlocks.findIndex((element) =>
-      /^(?:EL|LA)\s+(?:PROPIETARIO|PROPIETARIA|ASESOR|ASESORA)\s*[:.-]?\s*_*$/i.test(normalizedText(element)),
-    );
-    if (signatureStart >= 0) {
-      for (const element of textBlocks.slice(signatureStart)) {
+    const isRoleLabel = (element: HTMLElement) =>
+      /^(?:EL|LA)\s+(?:PROPIETARIO|PROPIETARIA|ASESOR|ASESORA)\s*[:.-]?\s*_*$/i.test(normalizedText(element));
+    const roleLabels = textBlocks.filter(isRoleLabel);
+    const signatureStart = roleLabels.at(0);
+
+    if (signatureStart) {
+      const signatureIndex = textBlocks.indexOf(signatureStart);
+      for (const element of textBlocks.slice(signatureIndex)) {
         element.classList.add("c21-pdf-signature-block");
       }
-      const dateBlock = textBlocks.slice(0, signatureStart).reverse().find((element) =>
+      const dateBlock = textBlocks.slice(0, signatureIndex).reverse().find((element) =>
         /\b\d{1,2}\s+de\s+[a-záéíóú]+\s+de\s+\d{4}\b/i.test(normalizedText(element)),
       );
       dateBlock?.classList.add("c21-pdf-signature-block");
+
+      const isSignatureRule = (element: HTMLElement) =>
+        /^[_\u2014\u2013\-\s]{3,}$/.test(normalizedText(element)) || Boolean(element.querySelector("hr"));
+
+      for (const label of roleLabels) {
+        const labelRow = label.closest("tr");
+        const table = label.closest("table");
+        if (labelRow && table) {
+          const rows = Array.from(table.querySelectorAll("tr"));
+          const labelRowIndex = rows.indexOf(labelRow);
+          const ruleRow = rows.slice(labelRowIndex + 1, labelRowIndex + 4).find((row) => {
+            const cells = Array.from(row.querySelectorAll<HTMLElement>("td,th"));
+            return cells.length > 0 && cells.every((cell) => !normalizedText(cell) || isSignatureRule(cell));
+          });
+          const rowParent = labelRow.parentElement;
+          if (ruleRow && rowParent && rowParent === ruleRow.parentElement) {
+            rowParent.insertBefore(ruleRow, labelRow);
+          }
+          continue;
+        }
+
+        const labelParent = label.parentElement;
+        const followingRule = labelParent && Array.from(labelParent.children)
+          .slice(Array.from(labelParent.children).indexOf(label) + 1)
+          .find((element): element is HTMLElement => isSignatureRule(element as HTMLElement));
+        if (labelParent && followingRule) labelParent.insertBefore(followingRule, label);
+      }
     }
   }
 }
