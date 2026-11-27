@@ -41,8 +41,15 @@ function collectPdfCssRules(rules: CSSRuleList): string {
 function preparePdfContractAlignment(contract: HTMLElement) {
   const normalizedText = (element: HTMLElement) => (element.innerText || element.textContent || "").replace(/\s+/g, " ").trim();
   const textBlocks = Array.from(contract.querySelectorAll<HTMLElement>(
-    "h1,h2,h3,h4,h5,h6,p,li,td,th,blockquote",
-  ));
+    "h1,h2,h3,h4,h5,h6,p,li,td,th,blockquote,div",
+  )).filter((element) => {
+    if (element.tagName !== "DIV") return true;
+    const containsTextBlock = element.querySelector("h1,h2,h3,h4,h5,h6,p,li,td,th,blockquote");
+    const hasDirectText = Array.from(element.childNodes).some(
+      (node) => node.nodeType === Node.TEXT_NODE && Boolean(node.textContent?.trim()),
+    );
+    return !containsTextBlock || hasDirectText;
+  });
 
   const title = textBlocks.find((element) =>
     /^CONTRATO\b/i.test(normalizedText(element)) && normalizedText(element).length < 180,
@@ -71,8 +78,15 @@ function preparePdfContractAlignment(contract: HTMLElement) {
       );
       dateBlock?.classList.add("c21-pdf-signature-block");
 
-      const isSignatureRule = (element: HTMLElement) =>
-        /^[_\u2014\u2013\-\s]{3,}$/.test(normalizedText(element)) || Boolean(element.querySelector("hr"));
+      const isSignatureRule = (element: HTMLElement) => {
+        const text = normalizedText(element);
+        if (/^[_\u2014\u2013\-\s]{3,}$/.test(text) || element.querySelector("hr")) return true;
+        const elements = [element, ...Array.from(element.querySelectorAll<HTMLElement>("*"))];
+        return elements.some((candidate) => {
+          const style = candidate.ownerDocument.defaultView?.getComputedStyle(candidate);
+          return Boolean(style && style.borderBottomStyle !== "none" && Number.parseFloat(style.borderBottomWidth) > 0);
+        });
+      };
 
       for (const label of roleLabels) {
         const labelRow = label.closest("tr");
@@ -82,10 +96,12 @@ function preparePdfContractAlignment(contract: HTMLElement) {
           const labelRowIndex = rows.indexOf(labelRow);
           const ruleRow = rows.slice(labelRowIndex + 1, labelRowIndex + 4).find((row) => {
             const cells = Array.from(row.querySelectorAll<HTMLElement>("td,th"));
-            return cells.length > 0 && cells.every((cell) => !normalizedText(cell) || isSignatureRule(cell));
+            const hasRule = cells.some(isSignatureRule);
+            return hasRule && cells.length > 0 && cells.every((cell) => !normalizedText(cell) || isSignatureRule(cell));
           });
           const rowParent = labelRow.parentElement;
           if (ruleRow && rowParent && rowParent === ruleRow.parentElement) {
+            ruleRow.classList.add("c21-pdf-signature-block");
             rowParent.insertBefore(ruleRow, labelRow);
           }
           continue;
@@ -156,8 +172,24 @@ export function ContractDocumentPreview({ contractId, canDownload = true }: { co
   }
 
   function printHtml() {
-    htmlFrameRef.current?.contentWindow?.focus();
-    htmlFrameRef.current?.contentWindow?.print();
+    const frameWindow = htmlFrameRef.current?.contentWindow;
+    const frameDocument = htmlFrameRef.current?.contentDocument;
+    const contract = frameDocument?.querySelector<HTMLElement>(".c21-print-document");
+    if (contract && frameDocument) {
+      preparePdfContractAlignment(contract);
+      let style = frameDocument.getElementById("c21-print-signature-alignment") as HTMLStyleElement | null;
+      if (!style) {
+        style = frameDocument.createElement("style");
+        style.id = "c21-print-signature-alignment";
+        frameDocument.head.appendChild(style);
+      }
+      style.textContent = `
+        .c21-pdf-contract-title { text-align: center !important; }
+        .c21-pdf-signature-block, .c21-pdf-signature-block * { text-align: center !important; }
+      `;
+    }
+    frameWindow?.focus();
+    frameWindow?.print();
   }
 
   function printWordPreview() {
@@ -183,6 +215,7 @@ export function ContractDocumentPreview({ contractId, canDownload = true }: { co
     setDownloadingPdf(true);
     setError("");
     let pdfRoot: HTMLDivElement | null = null;
+    let pdfMain: HTMLElement | null = null;
     const headerLogos: Array<{ data: string; side: "left" | "right"; aspectRatio: number }> = [];
     try {
       const html2pdf = (await import("html2pdf.js")).default;
@@ -253,15 +286,16 @@ export function ContractDocumentPreview({ contractId, canDownload = true }: { co
         const watermark = sourceDocument.body.querySelector(".c21-print-watermark")?.cloneNode(true);
         if (watermark) pdfRoot.appendChild(watermark);
         const main = sourceDocument.body.querySelector(".c21-print-document")?.cloneNode(true);
-        if (!main) throw new Error("No se encontró el contenido del contrato para generar el PDF.");
-        preparePdfContractAlignment(main as HTMLElement);
-        pdfRoot.appendChild(main);
+        if (!main || main.nodeType !== Node.ELEMENT_NODE) throw new Error("No se encontró el contenido del contrato para generar el PDF.");
+        pdfMain = main as HTMLElement;
+        pdfRoot.appendChild(pdfMain);
       } else {
         if (!bodyRef.current || !styleRef.current) throw new Error("La vista previa Word todavía no está lista.");
         pdfRoot.innerHTML = `${styleRef.current.innerHTML}${bodyRef.current.innerHTML}`;
       }
 
       document.body.appendChild(pdfRoot);
+      if (pdfMain) preparePdfContractAlignment(pdfMain);
       await document.fonts.ready;
       await Promise.all(Array.from(pdfRoot.querySelectorAll("img")).map(async (image) => {
         if (!image.complete) await new Promise<void>((resolve) => {
