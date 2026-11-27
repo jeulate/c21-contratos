@@ -22,8 +22,8 @@ export function buildContractTemplateData(contract: Contract) {
   const extras = contract.extras ?? {};
   const profile: Partial<AdvisorProfile> = contract.asesorProfileSnapshot ?? {};
   const currency = contract.moneda as Currency;
-  const currencyName = CURRENCY_NAMES[currency] ?? contract.moneda;
-  const currencySymbol = CURRENCY_SYMBOLS[currency] ?? contract.moneda;
+  const currencyName = contract.monedaNombre ?? CURRENCY_NAMES[currency] ?? contract.moneda;
+  const currencySymbol = contract.monedaSimbolo ?? CURRENCY_SYMBOLS[currency] ?? contract.moneda;
   const amount = new Intl.NumberFormat("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(contract.monto);
   const parsedDate = new Date(`${contract.fecha}T12:00:00`);
   const dateLong = Number.isNaN(parsedDate.getTime()) ? contract.fecha : parsedDate.toLocaleDateString("es-BO", { day: "numeric", month: "long", year: "numeric" });

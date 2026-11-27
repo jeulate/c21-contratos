@@ -5,6 +5,7 @@ import { listContracts, type Contract } from "@/lib/contracts";
 import { stateLabel, typeLabel } from "@/lib/contract-types";
 import { StateBadge } from "@/components/badge";
 import { getDashboardExchangeRate } from "@/lib/dashboard-settings";
+import { getCurrencyCatalog } from "@/lib/contract-currencies";
 import { listUsers } from "@/lib/users";
 import { contractExpirationDate, UPCOMING_EXPIRY_WINDOW_DAYS } from "@/lib/contract-validity";
 
@@ -178,7 +179,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     to = today;
   }
 
-  const [allContracts, exchangeRate, users] = await Promise.all([listContracts(), getDashboardExchangeRate(), listUsers()]);
+  const [allContracts, exchangeRate, users, currencyCatalog] = await Promise.all([listContracts(), getDashboardExchangeRate(), listUsers(), getCurrencyCatalog()]);
   const isInRange = (value?: string) => Boolean(value && boliviaDate(new Date(value)) >= from && boliviaDate(new Date(value)) <= to);
   const createdInRange = allContracts.filter((contract) => isInRange(contract.createdAt));
   const expiryThrough = shiftDate(today, UPCOMING_EXPIRY_WINDOW_DAYS);
@@ -189,7 +190,9 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   });
   const signedInRange = allContracts.filter((contract) => contract.estado === "firmado" && isInRange(getSignedAt(contract)));
   const reviewingInRange = createdInRange.filter((contract) => contract.estado === "revision");
-  const signedBob = signedInRange.reduce((sum, contract) => sum + (contract.moneda === "USD" ? contract.monto * exchangeRate : contract.monto), 0);
+  const bobPerCurrency = new Map(currencyCatalog.filter((currency) => currency.bobPerUnit !== null).map((currency) => [currency.code, currency.bobPerUnit as number]));
+  const signedWithoutRate = signedInRange.filter((contract) => !bobPerCurrency.has(contract.moneda)).length;
+  const signedBob = signedInRange.reduce((sum, contract) => sum + contract.monto * (bobPerCurrency.get(contract.moneda) ?? 0), 0);
   const signedUsd = signedBob / exchangeRate;
   const byStatus = countBy(createdInRange, (contract) => contract.estado);
   const byType = countBy(createdInRange, (contract) => contract.tipo);
@@ -253,7 +256,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           <MetricCard label="Contratos registrados" value={createdInRange.length} sub="Registrados dentro del periodo" kind="documents" />
           <MetricCard label="Firmados en el periodo" value={signedInRange.length} sub="Según fecha de aprobación legal" kind="signed" />
           <MetricCard label="En revisión" value={reviewingInRange.length} sub="Pendientes entre los registros del periodo" kind="review" />
-          <MetricCard label="Monto firmado" value={`Bs. ${signedBob.toLocaleString("es-BO", { maximumFractionDigits: 2 })}`} sub="Equivalente consolidado en bolivianos" kind="money" detail={`USD ${signedUsd.toLocaleString("es-BO", { maximumFractionDigits: 2 })} · T.C. ${exchangeRate.toLocaleString("es-BO", { maximumFractionDigits: 4 })} Bs./USD`} />
+          <MetricCard label="Monto firmado" value={`Bs. ${signedBob.toLocaleString("es-BO", { maximumFractionDigits: 2 })}`} sub={signedWithoutRate ? `${signedWithoutRate} contrato(s) excluido(s): divisa sin equivalencia configurada` : "Equivalente consolidado en bolivianos"} kind="money" detail={`USD ${signedUsd.toLocaleString("es-BO", { maximumFractionDigits: 2 })} · T.C. ${exchangeRate.toLocaleString("es-BO", { maximumFractionDigits: 4 })} Bs./USD`} />
           <MetricCard label="Próximos a vencer" value={expiringSoon.length} sub={`Vencen en los próximos ${UPCOMING_EXPIRY_WINDOW_DAYS} días`} kind="expiry" />
         </div>
       </section>

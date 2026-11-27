@@ -35,8 +35,8 @@ export function ContractDetailsSummary({ contract, title = "Información enviada
           <Detail label="Propietario / cliente" value={contract.cliente} />
           <Detail label="Cédula de identidad" value={contract.clienteDoc || ""} />
           <Detail label="Inmueble / referencia" value={contract.propiedad} />
-          <Detail label="Monto" value={`${currency} · ${CURRENCY_SYMBOLS[currency] ?? currency} ${contract.monto.toLocaleString("es-BO")}`} />
-          <Detail label="Divisa" value={CURRENCY_NAMES[currency] ?? currency} />
+          <Detail label="Monto" value={`${currency} · ${contract.monedaSimbolo ?? CURRENCY_SYMBOLS[currency] ?? currency} ${contract.monto.toLocaleString("es-BO")}`} />
+          <Detail label="Divisa" value={contract.monedaNombre ?? CURRENCY_NAMES[currency] ?? currency} />
           <Detail label="Fecha del contrato" value={contract.fecha} />
           <Detail label="Asesor" value={contract.asesorNombre} />
         </dl>

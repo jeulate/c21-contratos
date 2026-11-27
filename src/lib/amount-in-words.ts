@@ -60,7 +60,7 @@ export function integerCountInWords(value: number): string {
 }
 
 /** Formats a monetary value as Spanish legal text, including cents and currency. */
-export function amountInWords(value: string | number, currency: Currency): string {
+export function amountInWords(value: string | number, currency: Currency, singular?: string, plural?: string): string {
   const normalized = String(value).trim().replace(",", ".");
   if (!normalized) return "";
   const amount = Number(normalized);
@@ -69,12 +69,11 @@ export function amountInWords(value: string | number, currency: Currency): strin
   const [integerText, centsText] = amount.toFixed(2).split(".");
   const integer = Number(integerText);
   const cents = Number(centsText);
-  const currencyName = CURRENCY_NAMES[currency].toUpperCase();
-  const singularName = currency === "BOB" ? "BOLIVIANO" : "DÓLAR AMERICANO";
-  const pluralName = currencyName;
+  const currencyName = (plural ?? CURRENCY_NAMES[currency] ?? currency).toUpperCase();
+  const singularName = (singular ?? (currency === "BOB" ? "Boliviano" : currency === "USD" ? "Dólar Americano" : currency)).toLocaleUpperCase("es-BO");
 
   if (cents === 0 && integer === 1) return `UN ${singularName}`;
   const numberWords = integer === 1 ? "un" : apocopate(integerToWords(integer));
   const amountText = `${numberWords} ${String(cents).padStart(2, "0")}/100`;
-  return `${amountText} ${pluralName}`.toLocaleUpperCase("es-BO");
+  return `${amountText} ${currencyName}`.toLocaleUpperCase("es-BO");
 }
