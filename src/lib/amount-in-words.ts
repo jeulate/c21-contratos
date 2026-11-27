@@ -49,6 +49,16 @@ function integerToWords(value: number): string {
   return groups.join(" ");
 }
 
+export function integerInWords(value: number): string {
+  if (!Number.isSafeInteger(value) || value < 0 || value > 999_999_999_999) return "";
+  return integerToWords(value);
+}
+
+export function integerCountInWords(value: number): string {
+  if (!Number.isSafeInteger(value) || value < 0 || value > 999_999_999_999) return "";
+  return apocopate(integerToWords(value));
+}
+
 /** Formats a monetary value as Spanish legal text, including cents and currency. */
 export function amountInWords(value: string | number, currency: Currency): string {
   const normalized = String(value).trim().replace(",", ".");

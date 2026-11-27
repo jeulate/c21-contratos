@@ -1,6 +1,7 @@
 import Docxtemplater from "docxtemplater";
 import PizZip from "pizzip";
 import type { Contract } from "./contracts";
+import { contractExpirationDate, validityInWords, validityUnitLabel } from "./contract-validity";
 import type { AdvisorProfile } from "./users";
 import type { ContractTemplateVersion } from "./contract-templates";
 import { CURRENCY_NAMES, CURRENCY_SYMBOLS, type Currency } from "./contract-types";
@@ -94,6 +95,10 @@ export function buildContractTemplateData(contract: Contract) {
     currencySymbol,
     date: dateLong,
     dateRaw: contract.fecha,
+    validityNumeric: contract.vigenciaCantidad ?? "",
+    validityUnit: contract.vigenciaCantidad && contract.vigenciaUnidad ? validityUnitLabel(contract.vigenciaCantidad, contract.vigenciaUnidad) : "",
+    validityInWords: contract.vigenciaEnPalabras || (contract.vigenciaCantidad && contract.vigenciaUnidad ? validityInWords(contract.vigenciaCantidad, contract.vigenciaUnidad) : ""),
+    expirationDate: contractExpirationDate(contract.fecha, contract.vigenciaCantidad, contract.vigenciaUnidad) ?? "",
     commission: contract.comision,
     status: contract.estado,
   };

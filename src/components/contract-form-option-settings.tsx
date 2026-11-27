@@ -4,6 +4,9 @@ import { useFormState } from "react-dom";
 import { saveContractFormOptionsAction, FormState } from "@/app/actions";
 import { SubmitButton } from "./submit-button";
 import type { ContractFormOptions } from "@/lib/contract-form-option-defaults";
+import { CONTRACT_VALIDITY_UNITS, type ContractValidityUnit } from "@/lib/contract-validity";
+
+const validityUnitLabels: Record<ContractValidityUnit, string> = { dias: "Días", meses: "Meses", años: "Años" };
 
 export function ContractFormOptionSettings({ options }: { options: ContractFormOptions }) {
   const [state, action] = useFormState<FormState, FormData>(saveContractFormOptionsAction, {});
@@ -11,7 +14,7 @@ export function ContractFormOptionSettings({ options }: { options: ContractFormO
     <form action={action} className="panel space-y-5 p-5 sm:p-6">
       <div>
         <h2 className="text-sm font-semibold text-ink dark:text-white">Opciones del formulario de contratos</h2>
-        <p className="mt-1 text-sm text-ink-mute dark:text-carbon-400">Administra las opciones que aparecen al registrar las características del inmueble y el lugar de expedición de documentos.</p>
+        <p className="mt-1 text-sm text-ink-mute dark:text-carbon-400">Administra las opciones que aparecen en los formularios de contratos, perfiles y datos de contacto.</p>
       </div>
       <div className="grid gap-5 lg:grid-cols-2">
         <div>
@@ -24,6 +27,17 @@ export function ContractFormOptionSettings({ options }: { options: ContractFormO
           <textarea id="identityCities" name="identityCities" rows={7} defaultValue={options.identityCities.join("\n")} className="input resize-y" required />
           <p className="mt-1 text-xs text-ink-mute dark:text-carbon-400">Una ciudad por línea. Puedes agregar o quitar opciones.</p>
         </div>
+        <fieldset className="rounded-xl border border-stone-200 p-4 dark:border-carbon-700">
+          <legend className="px-1 text-sm font-semibold text-ink dark:text-white">Unidades de vigencia disponibles</legend>
+          <p className="mb-3 text-xs text-ink-mute dark:text-carbon-400">Activa las unidades que los asesores podrán elegir al registrar la duración del contrato. Debe quedar al menos una opción.</p>
+          <div className="flex flex-wrap gap-3">
+            {CONTRACT_VALIDITY_UNITS.map((unit) => <label key={unit} className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-sm dark:border-carbon-700">
+              <input type="checkbox" name="validityUnits" value={unit} defaultChecked={options.validityUnits.includes(unit)} className="accent-gold-600" />
+              {validityUnitLabels[unit]}
+            </label>)}
+          </div>
+          <p className="mt-3 text-xs text-ink-mute dark:text-carbon-400">Al desactivar una unidad, los contratos existentes la conservan y siguen mostrando su vigencia.</p>
+        </fieldset>
         <div className="lg:col-span-2">
           <label className="label" htmlFor="countryCallingCodes">Países y prefijos telefónicos de WhatsApp</label>
           <textarea

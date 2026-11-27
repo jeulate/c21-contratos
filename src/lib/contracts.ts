@@ -21,6 +21,9 @@ export type Contract = {
   monto: number;
   moneda: string;
   fecha: string; // yyyy-mm-dd
+  vigenciaCantidad?: number;
+  vigenciaUnidad?: "dias" | "meses" | "años";
+  vigenciaEnPalabras?: string;
   comision: number; // %
   notas: string;
   extras: Record<string, string>;
