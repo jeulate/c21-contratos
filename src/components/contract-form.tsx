@@ -196,9 +196,14 @@ export function ContractForm({ contract, advisorProfile, currencyByType, currenc
             <div className="flex flex-col gap-2 sm:flex-row">
               {canChangeCurrency && !contract ? <div className="sm:w-56">
                 <label className="label" htmlFor="moneda">Divisa del contrato</label>
-                <select id="moneda" name="moneda" value={selectedCurrency} onChange={(event) => setSelectedCurrencyCode(event.target.value)} className="input">
-                  {activeCurrencyOptions.map((item) => <option key={item.code} value={item.code}>{item.code} · {item.name} ({item.symbol})</option>)}
-                </select>
+                <CorporateSelect
+                  id="moneda"
+                  name="moneda"
+                  value={selectedCurrency}
+                  onValueChange={setSelectedCurrencyCode}
+                  options={activeCurrencyOptions.map((item) => ({ value: item.code, label: `${item.code} · ${item.name} (${item.symbol})` }))}
+                  required
+                />
               </div> : <>
                 <input type="hidden" name="moneda" value={selectedCurrency} />
                 <div className="input flex shrink-0 flex-col justify-center bg-white sm:w-44 dark:bg-carbon-900" aria-label={`Divisa ${selectedCurrency}`}>
