@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { useFormState } from "react-dom";
 import { saveContract, FormState } from "@/app/actions";
 import { amountInWords } from "@/lib/amount-in-words";
+import { validityInWords, type ContractValidityUnit } from "@/lib/contract-validity";
 import { CONTRACT_TYPES, CURRENCY_NAMES, CURRENCY_SYMBOLS, isTemplateBasedContract, STATES, type Currency } from "@/lib/contract-types";
 import type { AdditionalContractOwner, Contract } from "@/lib/contracts";
 import type { AdvisorProfile } from "@/lib/users";
@@ -47,6 +48,8 @@ function SectionIcon({ type }: { type: "contract" | "owner" | "property" | "amou
 export function ContractForm({ contract, advisorProfile, currencyByType, formOptions, canManageState = true, evidenceSessionId }: { contract?: Contract; advisorProfile?: AdvisorProfile; currencyByType?: Record<string, Currency>; formOptions?: ContractFormOptions; canManageState?: boolean; evidenceSessionId?: string }) {
   const [tipo, setTipo] = useState(contract?.tipo ?? CONTRACT_TYPES[0].id);
   const [monto, setMonto] = useState(contract ? String(contract.monto) : "");
+  const [vigenciaCantidad, setVigenciaCantidad] = useState(contract?.vigenciaCantidad ? String(contract.vigenciaCantidad) : "");
+  const [vigenciaUnidad, setVigenciaUnidad] = useState<ContractValidityUnit>(contract?.vigenciaUnidad ?? "meses");
   const [evidenceIds, setEvidenceIds] = useState<string[]>([]);
   const [additionalOwners, setAdditionalOwners] = useState<AdditionalContractOwner[]>(contract?.additionalOwners ?? []);
   const [evidenceUploading, setEvidenceUploading] = useState(false);
@@ -68,6 +71,7 @@ export function ContractForm({ contract, advisorProfile, currencyByType, formOpt
   const sections = [...new Set(extras.map((field) => field.section ?? "Datos adicionales"))];
   const amountLabel = tipo === "exclusiva-alquiler" ? "Canon de arrendamiento mensual" : tipo === "exclusiva-anticretico" ? "Monto referencial de anticrético" : tipo === "exclusiva-rural" ? "Precio total referencial" : "Precio referencial de venta";
   const amountWords = amountInWords(monto, selectedCurrency);
+  const validityWords = validityInWords(Number(vigenciaCantidad), vigenciaUnidad);
   const firstValidationError = Object.values(fieldValidation).find((item) => item.status === "error");
 
   const validationClass = (id: string) => {
@@ -187,6 +191,20 @@ export function ContractForm({ contract, advisorProfile, currencyByType, formOpt
               <input id="monto" name="monto" type="number" step="0.01" min="0" value={monto} onChange={(event) => setMonto(event.target.value)} className={`input ${validationClass("monto")}`} placeholder="Ej.: 300000" aria-invalid={fieldValidation.monto?.status === "error"} aria-describedby={fieldValidation.monto ? "montoFeedback" : undefined} required />
               {fieldFeedback("monto")}
             </div>
+          <div>
+            <label className="label" htmlFor="vigenciaCantidad">Vigencia del contrato</label>
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(130px,0.8fr)] gap-2">
+              <input id="vigenciaCantidad" name="vigenciaCantidad" type="number" min="1" max="36500" step="1" inputMode="numeric" value={vigenciaCantidad} onChange={(event) => setVigenciaCantidad(event.target.value)} className={`input ${validationClass("vigenciaCantidad")}`} placeholder="Ej.: 4" aria-invalid={fieldValidation.vigenciaCantidad?.status === "error"} aria-describedby={fieldValidation.vigenciaCantidad ? "vigenciaCantidadFeedback" : "vigenciaCantidadHelp"} required />
+              <CorporateSelect id="vigenciaUnidad" name="vigenciaUnidad" value={vigenciaUnidad} onValueChange={(value) => setVigenciaUnidad(value as ContractValidityUnit)} options={[{ value: "dias", label: "Días" }, { value: "meses", label: "Meses" }, { value: "años", label: "Años" }]} required />
+            </div>
+            {fieldFeedback("vigenciaCantidad")}
+            <p id="vigenciaCantidadHelp" className="mt-1 text-xs text-ink-mute dark:text-carbon-400">La fecha de vencimiento se calcula desde la fecha del contrato.</p>
+          </div>
+          <div>
+            <label className="label" htmlFor="vigenciaEnPalabras">Vigencia en palabras</label>
+            <input id="vigenciaEnPalabras" value={validityWords} readOnly className="input bg-stone-50 uppercase dark:bg-carbon-950" placeholder="Se completa desde la vigencia numérica" aria-describedby="vigenciaWordsHelp" />
+            <p id="vigenciaWordsHelp" className="mt-1 text-xs text-ink-mute dark:text-carbon-400">Se actualiza automáticamente al cambiar la vigencia.</p>
+          </div>
           </div>
           {!templateBased && <div>
             <label className="label" htmlFor="comision">Comisión (%)</label>

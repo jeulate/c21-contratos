@@ -6,6 +6,7 @@ import { stateLabel, typeLabel } from "@/lib/contract-types";
 import { StateBadge } from "@/components/badge";
 import { getDashboardExchangeRate } from "@/lib/dashboard-settings";
 import { listUsers } from "@/lib/users";
+import { contractExpirationDate, UPCOMING_EXPIRY_WINDOW_DAYS } from "@/lib/contract-validity";
 
 const timeZone = "America/La_Paz";
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
@@ -54,17 +55,18 @@ function countBy<T>(items: T[], getKey: (item: T) => string) {
   return [...counts.entries()].sort((a, b) => b[1] - a[1]);
 }
 
-function MetricIcon({ kind }: { kind: "documents" | "signed" | "review" | "money" }) {
+function MetricIcon({ kind }: { kind: "documents" | "signed" | "review" | "money" | "expiry" }) {
   const paths = {
     documents: <><path d="M7 3.75h7l4 4v12.5a1.75 1.75 0 0 1-1.75 1.75h-9.5A1.75 1.75 0 0 1 5 20.25V5.5a1.75 1.75 0 0 1 2-1.75Z" /><path d="M14 4v4h4M8.5 13h7m-7 3.5h7" /></>,
     signed: <><path d="m5 12 4.5 4.5L19 7" /><circle cx="12" cy="12" r="9" /></>,
     review: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
     money: <><path d="M12 3v18m5-14H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></>,
+    expiry: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2M8 2v2m8-2v2" /></>,
   };
   return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">{paths[kind]}</svg>;
 }
 
-function MetricCard({ label, value, sub, kind, detail }: { label: string; value: string | number; sub: string; kind: "documents" | "signed" | "review" | "money"; detail?: string }) {
+function MetricCard({ label, value, sub, kind, detail }: { label: string; value: string | number; sub: string; kind: "documents" | "signed" | "review" | "money" | "expiry"; detail?: string }) {
   return (
     <section className="panel relative overflow-hidden p-5 sm:p-6">
       <div className="flex items-start justify-between gap-3">
@@ -179,6 +181,12 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const [allContracts, exchangeRate, users] = await Promise.all([listContracts(), getDashboardExchangeRate(), listUsers()]);
   const isInRange = (value?: string) => Boolean(value && boliviaDate(new Date(value)) >= from && boliviaDate(new Date(value)) <= to);
   const createdInRange = allContracts.filter((contract) => isInRange(contract.createdAt));
+  const expiryThrough = shiftDate(today, UPCOMING_EXPIRY_WINDOW_DAYS);
+  const expiringSoon = allContracts.filter((contract) => {
+    if (contract.estado === "anulado") return false;
+    const expiry = contractExpirationDate(contract.fecha, contract.vigenciaCantidad, contract.vigenciaUnidad);
+    return Boolean(expiry && expiry >= today && expiry <= expiryThrough);
+  });
   const signedInRange = allContracts.filter((contract) => contract.estado === "firmado" && isInRange(getSignedAt(contract)));
   const reviewingInRange = createdInRange.filter((contract) => contract.estado === "revision");
   const signedBob = signedInRange.reduce((sum, contract) => sum + (contract.moneda === "USD" ? contract.monto * exchangeRate : contract.monto), 0);
@@ -241,11 +249,12 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           <button type="submit" className="btn-ghost h-[42px] gap-2"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className="h-4 w-4"><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M7 12h10m-7 6h4" /></svg>Filtrar fechas</button>
           {rangeError && <p role="alert" className="text-sm text-red-600 dark:text-red-300 sm:self-center">{rangeError}</p>}
         </form>
-        <div className="grid divide-y divide-stone-100 dark:divide-carbon-800 sm:grid-cols-2 sm:divide-x sm:divide-y-0 2xl:grid-cols-4 2xl:divide-x-0 2xl:divide-y-0">
+        <div className="grid divide-y divide-stone-100 dark:divide-carbon-800 sm:grid-cols-2 sm:divide-x sm:divide-y-0 2xl:grid-cols-5 2xl:divide-x-0 2xl:divide-y-0">
           <MetricCard label="Contratos registrados" value={createdInRange.length} sub="Registrados dentro del periodo" kind="documents" />
           <MetricCard label="Firmados en el periodo" value={signedInRange.length} sub="Según fecha de aprobación legal" kind="signed" />
           <MetricCard label="En revisión" value={reviewingInRange.length} sub="Pendientes entre los registros del periodo" kind="review" />
           <MetricCard label="Monto firmado" value={`Bs. ${signedBob.toLocaleString("es-BO", { maximumFractionDigits: 2 })}`} sub="Equivalente consolidado en bolivianos" kind="money" detail={`USD ${signedUsd.toLocaleString("es-BO", { maximumFractionDigits: 2 })} · T.C. ${exchangeRate.toLocaleString("es-BO", { maximumFractionDigits: 4 })} Bs./USD`} />
+          <MetricCard label="Próximos a vencer" value={expiringSoon.length} sub={`Vencen en los próximos ${UPCOMING_EXPIRY_WINDOW_DAYS} días`} kind="expiry" />
         </div>
       </section>
 
