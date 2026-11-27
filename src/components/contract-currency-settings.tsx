@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { useFormState } from "react-dom";
-import { saveContractCurrencyAction, saveCurrencyDefinitionAction, type FormState } from "@/app/actions";
+import { saveAdvisorCurrencyChangeAllowedAction, saveContractCurrencyAction, saveCurrencyDefinitionAction, type FormState } from "@/app/actions";
 import { SubmitButton } from "./submit-button";
 import type { ContractType } from "@/lib/contract-types";
 import type { CurrencyDefinition } from "@/lib/contract-currencies";
@@ -72,13 +73,17 @@ function CurrencyEditor({ currency, isNew = false }: { currency?: CurrencyDefini
   );
 }
 
-export function ContractCurrencySettings({ types, currencies, values }: {
+export function ContractCurrencySettings({ types, currencies, values, advisorsCanChangeCurrency }: {
   types: ContractType[];
   currencies: CurrencyDefinition[];
   values: Record<string, string>;
+  advisorsCanChangeCurrency: boolean;
 }) {
+  const [addingCurrency, setAddingCurrency] = useState(false);
+  const [editingCode, setEditingCode] = useState<string | null>(null);
   const enabled = currencies.filter((currency) => currency.enabled && currency.bobPerUnit !== null);
   return <div className="space-y-5">
+    <AdvisorCurrencyPermission allowed={advisorsCanChangeCurrency} />
     <section className="space-y-3">
       <div>
         <h3 className="text-base font-semibold text-ink dark:text-white">Divisas por tipo de contrato</h3>
@@ -91,11 +96,46 @@ export function ContractCurrencySettings({ types, currencies, values }: {
         <h3 className="text-base font-semibold text-ink dark:text-white">Catálogo de divisas y tipos de cambio</h3>
         <p className="mt-1 max-w-4xl text-sm leading-6 text-ink-mute dark:text-carbon-400">Administra códigos, nombres, símbolos y equivalencias manuales frente al boliviano. Una divisa solo estará disponible al activarla y definir cuántos Bs. equivale una unidad. BOB es la divisa base del dashboard. Desactivar una divisa no altera contratos existentes.</p>
       </div>
-      <div className="space-y-3">{currencies.map((currency) => <CurrencyEditor key={currency.code} currency={currency} />)}</div>
+      <div className="space-y-3">{currencies.map((currency) => <article key={currency.code} className="rounded-xl border border-stone-200 bg-white p-4 dark:border-carbon-700 dark:bg-carbon-950">
+        {editingCode === currency.code ? <CurrencyEditor currency={currency} /> : <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="font-semibold text-ink dark:text-white">{currency.code} · {currency.name} <span className="font-normal text-ink-mute dark:text-carbon-400">({currency.symbol})</span></p>
+            <p className="mt-1 text-xs text-ink-mute dark:text-carbon-400">1 {currency.code} = {currency.bobPerUnit === null ? "tipo de cambio pendiente" : `${currency.bobPerUnit.toLocaleString("es-BO")} Bs.`} · {currency.enabled ? "Disponible" : "Desactivada"}</p>
+          </div>
+          <button type="button" className="btn-ghost" onClick={() => setEditingCode(currency.code)}>Editar</button>
+        </div>}
+        {editingCode === currency.code && <button type="button" className="mt-3 text-sm text-ink-mute underline dark:text-carbon-400" onClick={() => setEditingCode(null)}>Cancelar edición</button>}
+      </article>)}</div>
       <div className="border-t border-stone-200 pt-4 dark:border-carbon-700">
-        <h4 className="mb-3 text-sm font-semibold text-ink dark:text-white">Agregar una divisa</h4>
-        <CurrencyEditor isNew />
+        {!addingCurrency ? <button type="button" className="btn-ghost" onClick={() => setAddingCurrency(true)}>Agregar divisa</button> : <>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h4 className="text-sm font-semibold text-ink dark:text-white">Nueva divisa</h4>
+            <button type="button" className="btn-ghost" onClick={() => setAddingCurrency(false)}>Cancelar</button>
+          </div>
+          <CurrencyEditor isNew />
+        </>}
       </div>
     </section>
   </div>;
+}
+
+function AdvisorCurrencyPermission({ allowed }: { allowed: boolean }) {
+  const [enabled, setEnabled] = useState(allowed);
+  const [state, action] = useFormState<FormState, FormData>(saveAdvisorCurrencyChangeAllowedAction, {});
+  return <form action={action} className="panel flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+      <h3 className="text-sm font-semibold text-ink dark:text-white">Cambio de divisa por asesores</h3>
+      <p className="mt-1 text-sm text-ink-mute dark:text-carbon-400">{enabled ? "Los asesores podrán elegir cualquier divisa activa al crear un contrato." : "Los asesores usarán la divisa asignada por administración a cada tipo de contrato."}</p>
+      {state.error && <p role="alert" className="mt-2 text-sm text-red-700 dark:text-red-300">{state.error}</p>}
+      {state.ok && <p role="status" className="mt-2 text-sm text-emerald-700 dark:text-emerald-300">{state.ok}</p>}
+    </div>
+    <label className="inline-flex cursor-pointer items-center gap-3 self-start sm:self-center">
+      <span className="text-sm font-medium text-ink-soft dark:text-carbon-300">{enabled ? "Permitido" : "Bloqueado"}</span>
+      <input className="peer sr-only" type="checkbox" name="allowed" value="true" checked={enabled} onChange={(event) => {
+        setEnabled(event.target.checked);
+        event.currentTarget.form?.requestSubmit();
+      }} role="switch" aria-label="Permitir que los asesores cambien la divisa" />
+      <span aria-hidden="true" className="relative h-6 w-11 rounded-full bg-stone-300 transition peer-checked:bg-gold-600 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-gold-600 dark:bg-carbon-700 after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-transform peer-checked:after:translate-x-5" />
+    </label>
+  </form>;
 }

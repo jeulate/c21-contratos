@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useFormState } from "react-dom";
 import { saveContract, FormState } from "@/app/actions";
 import { amountInWords } from "@/lib/amount-in-words";
@@ -46,8 +46,9 @@ function SectionIcon({ type }: { type: "contract" | "owner" | "property" | "amou
   </span>;
 }
 
-export function ContractForm({ contract, advisorProfile, currencyByType, currencyCatalog = [], formOptions, canManageState = true, evidenceSessionId }: { contract?: Contract; advisorProfile?: AdvisorProfile; currencyByType?: Record<string, Currency>; currencyCatalog?: CurrencyDefinition[]; formOptions?: ContractFormOptions; canManageState?: boolean; evidenceSessionId?: string }) {
+export function ContractForm({ contract, advisorProfile, currencyByType, currencyCatalog = [], canChangeCurrency = false, formOptions, canManageState = true, evidenceSessionId }: { contract?: Contract; advisorProfile?: AdvisorProfile; currencyByType?: Record<string, Currency>; currencyCatalog?: CurrencyDefinition[]; canChangeCurrency?: boolean; formOptions?: ContractFormOptions; canManageState?: boolean; evidenceSessionId?: string }) {
   const [tipo, setTipo] = useState(contract?.tipo ?? CONTRACT_TYPES[0].id);
+  const [selectedCurrencyCode, setSelectedCurrencyCode] = useState(contract?.moneda ?? currencyByType?.[contract?.tipo ?? CONTRACT_TYPES[0].id] ?? "BOB");
   const [monto, setMonto] = useState(contract ? String(contract.monto) : "");
   const [vigenciaCantidad, setVigenciaCantidad] = useState(contract?.vigenciaCantidad ? String(contract.vigenciaCantidad) : "");
   const [vigenciaUnidad, setVigenciaUnidad] = useState<ContractValidityUnit>(contract?.vigenciaUnidad ?? formOptions?.validityUnits[0] ?? DEFAULT_VALIDITY_UNITS[0]);
@@ -60,14 +61,18 @@ export function ContractForm({ contract, advisorProfile, currencyByType, currenc
     setEvidenceUploading(uploading);
   }, []);
   const [state, action] = useFormState<FormState, FormData>(saveContract.bind(null, contract?.id ?? null), {});
+  useEffect(() => {
+    if (!contract) setSelectedCurrencyCode(currencyByType?.[tipo] ?? "BOB");
+  }, [contract, currencyByType, tipo]);
   const contractType = CONTRACT_TYPES.find((item) => item.id === tipo);
   const extras = contractType?.extras ?? [];
   const templateBased = isTemplateBasedContract(tipo);
-  const selectedCurrency = (contract?.moneda ?? currencyByType?.[tipo] ?? "BOB") as Currency;
+  const selectedCurrency = selectedCurrencyCode as Currency;
   const selectedCurrencyDefinition = currencyCatalog.find((item) => item.code === selectedCurrency);
   const currencyName = contract?.monedaNombre ?? selectedCurrencyDefinition?.name ?? CURRENCY_NAMES[selectedCurrency] ?? selectedCurrency;
   const currencySingular = contract?.monedaSingular ?? selectedCurrencyDefinition?.singularName;
   const currencySymbol = contract?.monedaSimbolo ?? selectedCurrencyDefinition?.symbol ?? CURRENCY_SYMBOLS[selectedCurrency] ?? selectedCurrency;
+  const activeCurrencyOptions = currencyCatalog.filter((item) => item.enabled && item.bobPerUnit !== null);
   const selectedProfile = contract?.asesorProfileSnapshot ?? advisorProfile;
   const propertyTypes = formOptions?.propertyTypes ?? [...DEFAULT_PROPERTY_TYPES];
   const identityCities = formOptions?.identityCities ?? [...DEFAULT_IDENTITY_CITIES];
@@ -189,11 +194,18 @@ export function ContractForm({ contract, advisorProfile, currencyByType, currenc
           <div className="sm:col-span-2">
             <label className="label" htmlFor="monto">{templateBased ? amountLabel : "Monto"}</label>
             <div className="flex flex-col gap-2 sm:flex-row">
-              <input type="hidden" name="moneda" value={selectedCurrency} />
-              <div className="input flex shrink-0 flex-col justify-center bg-white sm:w-44 dark:bg-carbon-900" aria-label={`Divisa ${selectedCurrency}`}>
-                <span className="text-sm font-semibold">{selectedCurrency} · {currencySymbol}</span>
-                <span className="text-[10px] text-ink-mute dark:text-carbon-400">{currencyName}</span>
-              </div>
+              {canChangeCurrency && !contract ? <div className="sm:w-56">
+                <label className="label" htmlFor="moneda">Divisa del contrato</label>
+                <select id="moneda" name="moneda" value={selectedCurrency} onChange={(event) => setSelectedCurrencyCode(event.target.value)} className="input">
+                  {activeCurrencyOptions.map((item) => <option key={item.code} value={item.code}>{item.code} · {item.name} ({item.symbol})</option>)}
+                </select>
+              </div> : <>
+                <input type="hidden" name="moneda" value={selectedCurrency} />
+                <div className="input flex shrink-0 flex-col justify-center bg-white sm:w-44 dark:bg-carbon-900" aria-label={`Divisa ${selectedCurrency}`}>
+                  <span className="text-sm font-semibold">{selectedCurrency} · {currencySymbol}</span>
+                  <span className="text-[10px] text-ink-mute dark:text-carbon-400">{currencyName}</span>
+                </div>
+              </>}
               <input id="monto" name="monto" type="number" step="0.01" min="0" value={monto} onChange={(event) => setMonto(event.target.value)} className={`input ${validationClass("monto")}`} placeholder="Ej.: 300000" aria-invalid={fieldValidation.monto?.status === "error"} aria-describedby={fieldValidation.monto ? "montoFeedback" : undefined} required />
               {fieldFeedback("monto")}
             </div>

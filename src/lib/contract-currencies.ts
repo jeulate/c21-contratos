@@ -12,6 +12,7 @@ export type CurrencyDefinition = {
 };
 
 const catalogKey = "currencies:catalog";
+const advisorCurrencyChangeKey = "currencies:advisor-change-enabled";
 const legacyUsdRateKey = "dashboard:exchange-rate-bob-usd";
 const contractCurrencyKey = (type: string) => `contract-currency:${type}`;
 
@@ -93,4 +94,12 @@ export async function setContractCurrency(type: string, currency: Currency): Pro
   const enabled = await getEnabledCurrencies();
   if (!enabled.some((item) => item.code === currency)) throw new Error("La divisa no está activa o aún no tiene tipo de cambio configurado.");
   await redis.set(contractCurrencyKey(type), currency);
+}
+
+export async function getAdvisorCurrencyChangeAllowed(): Promise<boolean> {
+  return (await redis.get<boolean>(advisorCurrencyChangeKey)) === true;
+}
+
+export async function setAdvisorCurrencyChangeAllowed(allowed: boolean): Promise<void> {
+  await redis.set(advisorCurrencyChangeKey, allowed);
 }

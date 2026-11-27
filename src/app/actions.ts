@@ -11,7 +11,7 @@ import { isAdvisorProfileComplete } from "@/lib/advisor-profile";
 import { CONTRACT_TYPES, isTemplateBasedContract, STATES } from "@/lib/contract-types";
 import { changeContractState, ContractInput, createContract, getContract, listContracts, markSignedContractNotificationAsRead, updateContract, validateAdditionalOwners, validateExtras } from "@/lib/contracts";
 import { activateTemplateVersion, createTemplateVersion, deleteTemplateVersion, getActiveTemplate, getTemplateVersion, listTemplateVersions } from "@/lib/contract-templates";
-import { getContractCurrency, getCurrencyCatalog, getCurrencyDefinition, setContractCurrency, setCurrencyDefinition } from "@/lib/contract-currencies";
+import { getAdvisorCurrencyChangeAllowed, getContractCurrency, getCurrencyCatalog, getCurrencyDefinition, setAdvisorCurrencyChangeAllowed, setContractCurrency, setCurrencyDefinition } from "@/lib/contract-currencies";
 import { getContractFormOptions, setContractFormOptions } from "@/lib/contract-form-options";
 import { setContractPrintSettings } from "@/lib/contract-print-settings";
 import { setDashboardExchangeRate } from "@/lib/dashboard-settings";
@@ -129,8 +129,10 @@ export async function saveContract(id: string | null, _: FormState, fd: FormData
     return { ok: current.estado === "observado" && session.role === "asesor" ? "Cambios guardados y contrato reenviado a revisión legal" : "Cambios guardados" };
   }
   const configuredCurrency = await getContractCurrency(parsed.data.tipo);
-  if (configuredCurrency !== parsed.data.moneda) return { error: "La divisa del formulario cambió. Recarga la página antes de crear el contrato." };
-  const currencyDefinition = await getCurrencyDefinition(configuredCurrency);
+  const advisorCanChangeCurrency = session.role === "asesor" && await getAdvisorCurrencyChangeAllowed();
+  if (!advisorCanChangeCurrency && configuredCurrency !== parsed.data.moneda) return { error: "La divisa del formulario cambió. Recarga la página antes de crear el contrato." };
+  const selectedCurrency = parsed.data.moneda;
+  const currencyDefinition = await getCurrencyDefinition(selectedCurrency);
   if (!currencyDefinition?.enabled || currencyDefinition.bobPerUnit === null) return { error: "La divisa seleccionada ya no está activa o no tiene tipo de cambio." };
   const evidenceSessionId = String(fd.get("evidenceSessionId") ?? "");
   let evidenceIds: string[];
@@ -156,7 +158,7 @@ export async function saveContract(id: string | null, _: FormState, fd: FormData
   let created;
   try {
     created = await createContract(
-      { ...input, estado: "revision", moneda: configuredCurrency, monedaNombre: currencyDefinition.name, monedaSingular: currencyDefinition.singularName, monedaSimbolo: currencyDefinition.symbol },
+      { ...input, estado: "revision", moneda: selectedCurrency, monedaNombre: currencyDefinition.name, monedaSingular: currencyDefinition.singularName, monedaSimbolo: currencyDefinition.symbol },
       session,
       creator?.advisorProfile,
       templateVersionId,
@@ -167,6 +169,19 @@ export async function saveContract(id: string | null, _: FormState, fd: FormData
     return { error: "No se pudo guardar el contrato. Las imágenes no se asociaron." };
   }
   redirect(`/contratos/${created.id}`);
+}
+
+export async function saveAdvisorCurrencyChangeAllowedAction(_: FormState, fd: FormData): Promise<FormState> {
+  await requireSession(["admin"]);
+  const allowed = fd.get("allowed") === "true";
+  try {
+    await setAdvisorCurrencyChangeAllowed(allowed);
+    revalidatePath("/configuracion-contratos");
+    revalidatePath("/contratos/nuevo");
+    return { ok: allowed ? "Los asesores podrán elegir una divisa activa al crear contratos." : "Los asesores usarán la divisa asignada a cada tipo de contrato." };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "No se pudo guardar el permiso." };
+  }
 }
 
 export async function saveContractCurrencyAction(_: FormState, fd: FormData): Promise<FormState> {
@@ -206,6 +221,7 @@ export async function saveCurrencyDefinitionAction(_: FormState, fd: FormData): 
 
   const catalog = await getCurrencyCatalog();
   const current = catalog.find((item) => item.code === parsed.data.code);
+  if (raw.isNew === "true" && current) return { error: `La divisa ${parsed.data.code} ya existe. Usa “Editar” en el catálogo.` };
   if (!current && raw.isNew !== "true") return { error: "No se encontró la divisa que intentas actualizar." };
   const rate = parsed.data.bobPerUnit === "" ? null : parsed.data.bobPerUnit;
   const enabled = parsed.data.enabled === "true";
