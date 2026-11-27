@@ -8,10 +8,10 @@ import { requireSession, isStaff } from "@/lib/auth";
 import { COOKIE, signSession, Role } from "@/lib/session";
 import { AdvisorProfile, checkPassword, createUser, getUser, patchUser } from "@/lib/users";
 import { isAdvisorProfileComplete } from "@/lib/advisor-profile";
-import { CONTRACT_TYPES, CURRENCIES, isTemplateBasedContract, STATES } from "@/lib/contract-types";
+import { CONTRACT_TYPES, isTemplateBasedContract, STATES } from "@/lib/contract-types";
 import { changeContractState, ContractInput, createContract, getContract, listContracts, markSignedContractNotificationAsRead, updateContract, validateAdditionalOwners, validateExtras } from "@/lib/contracts";
 import { activateTemplateVersion, createTemplateVersion, deleteTemplateVersion, getActiveTemplate, getTemplateVersion, listTemplateVersions } from "@/lib/contract-templates";
-import { getContractCurrency, setContractCurrency } from "@/lib/contract-currencies";
+import { getContractCurrency, getCurrencyCatalog, getCurrencyDefinition, setContractCurrency, setCurrencyDefinition } from "@/lib/contract-currencies";
 import { getContractFormOptions, setContractFormOptions } from "@/lib/contract-form-options";
 import { setContractPrintSettings } from "@/lib/contract-print-settings";
 import { setDashboardExchangeRate } from "@/lib/dashboard-settings";
@@ -53,7 +53,7 @@ const contractSchema = z.object({
   clienteDoc: z.string().trim().default(""),
   propiedad: z.string().trim().min(3, "Indica la propiedad o dirección"),
   monto: z.coerce.number().min(0, "El monto no es válido"),
-  moneda: z.enum(CURRENCIES),
+  moneda: z.string().regex(/^[A-Z]{3}$/, "Selecciona una divisa válida."),
   fecha: z.string().min(1, "Indica la fecha"),
   vigenciaCantidad: z.coerce.number().int("La vigencia debe expresarse en números enteros.").min(1, "La vigencia mínima es de una unidad.").max(36_500, "La vigencia supera el límite permitido."),
   vigenciaUnidad: z.enum(["dias", "meses", "años"]),
@@ -116,6 +116,9 @@ export async function saveContract(id: string | null, _: FormState, fd: FormData
     await updateContract(id, {
       ...input,
       moneda: current.moneda,
+      monedaNombre: current.monedaNombre,
+      monedaSingular: current.monedaSingular,
+      monedaSimbolo: current.monedaSimbolo,
       ...(session.role === "asesor" ? { estado: current.estado } : {}),
     }, session.username);
     if (session.role === "asesor" && current.estado === "observado") {
@@ -126,6 +129,9 @@ export async function saveContract(id: string | null, _: FormState, fd: FormData
     return { ok: current.estado === "observado" && session.role === "asesor" ? "Cambios guardados y contrato reenviado a revisión legal" : "Cambios guardados" };
   }
   const configuredCurrency = await getContractCurrency(parsed.data.tipo);
+  if (configuredCurrency !== parsed.data.moneda) return { error: "La divisa del formulario cambió. Recarga la página antes de crear el contrato." };
+  const currencyDefinition = await getCurrencyDefinition(configuredCurrency);
+  if (!currencyDefinition?.enabled || currencyDefinition.bobPerUnit === null) return { error: "La divisa seleccionada ya no está activa o no tiene tipo de cambio." };
   const evidenceSessionId = String(fd.get("evidenceSessionId") ?? "");
   let evidenceIds: string[];
   try {
@@ -150,7 +156,7 @@ export async function saveContract(id: string | null, _: FormState, fd: FormData
   let created;
   try {
     created = await createContract(
-      { ...input, estado: "revision", moneda: configuredCurrency },
+      { ...input, estado: "revision", moneda: configuredCurrency, monedaNombre: currencyDefinition.name, monedaSingular: currencyDefinition.singularName, monedaSimbolo: currencyDefinition.symbol },
       session,
       creator?.advisorProfile,
       templateVersionId,
@@ -167,7 +173,7 @@ export async function saveContractCurrencyAction(_: FormState, fd: FormData): Pr
   await requireSession(["admin"]);
   const parsed = z.object({
     tipo: z.enum(CONTRACT_TYPES.map((item) => item.id) as [string, ...string[]]),
-    moneda: z.enum(CURRENCIES),
+    moneda: z.string().regex(/^[A-Z]{3}$/),
   }).safeParse(Object.fromEntries(fd));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
@@ -179,6 +185,45 @@ export async function saveContractCurrencyAction(_: FormState, fd: FormData): Pr
   revalidatePath("/configuracion-contratos");
   revalidatePath("/contratos/nuevo");
   return { ok: `Divisa ${parsed.data.moneda} guardada para ${CONTRACT_TYPES.find((item) => item.id === parsed.data.tipo)?.label}.` };
+}
+
+export async function saveCurrencyDefinitionAction(_: FormState, fd: FormData): Promise<FormState> {
+  await requireSession(["admin"]);
+  const raw = Object.fromEntries(fd);
+  const parsed = z.object({
+    code: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/, "Usa un código de tres letras, por ejemplo PYG."),
+    name: z.string().trim().min(2).max(60),
+    singularName: z.string().trim().min(2).max(60),
+    symbol: z.string().trim().min(1).max(8),
+    bobPerUnit: z.union([z.literal(""), z.coerce.number().finite().positive().max(1_000_000)]),
+    enabled: z.enum(["true", "false"]),
+  }).safeParse({
+    ...raw,
+    bobPerUnit: String(raw.bobPerUnit ?? ""),
+    enabled: raw.enabled === "on" || raw.enabled === "true" ? "true" : "false",
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Revisa los datos de la divisa." };
+
+  const catalog = await getCurrencyCatalog();
+  const current = catalog.find((item) => item.code === parsed.data.code);
+  if (!current && raw.isNew !== "true") return { error: "No se encontró la divisa que intentas actualizar." };
+  const rate = parsed.data.bobPerUnit === "" ? null : parsed.data.bobPerUnit;
+  const enabled = parsed.data.enabled === "true";
+  if (!enabled && current) {
+    const assigned = await Promise.all(CONTRACT_TYPES.map(async (type) => [type.label, await getContractCurrency(type.id)] as const));
+    const assignedTo = assigned.filter(([, currency]) => currency === current.code).map(([label]) => label);
+    if (assignedTo.length) return { error: `Antes de desactivar ${current.code}, cambia la divisa de: ${assignedTo.join(", ")}.` };
+  }
+
+  try {
+    await setCurrencyDefinition({ code: parsed.data.code, name: parsed.data.name, singularName: parsed.data.singularName, symbol: parsed.data.symbol, bobPerUnit: rate, enabled });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "No se pudo guardar la divisa." };
+  }
+  revalidatePath("/configuracion-contratos");
+  revalidatePath("/contratos/nuevo");
+  revalidatePath("/dashboard");
+  return { ok: `${parsed.data.code} guardada correctamente.` };
 }
 
 export async function saveDashboardExchangeRateAction(_: FormState, fd: FormData): Promise<FormState> {

@@ -1,6 +1,6 @@
 import { requireSession } from "@/lib/auth";
 import { getUser } from "@/lib/users";
-import { getContractCurrencies } from "@/lib/contract-currencies";
+import { getContractCurrencies, getCurrencyCatalog } from "@/lib/contract-currencies";
 import { getContractFormOptions } from "@/lib/contract-form-options";
 import { ContractForm } from "@/components/contract-form";
 import { AdvisorProfileRequiredDialog } from "@/components/advisor-profile-required-dialog";
@@ -10,10 +10,10 @@ export default async function NuevoContrato() {
   const session = await requireSession(["admin", "administrativo", "asesor"]);
   const user = await getUser(session.username);
   if (session.role === "asesor" && !isAdvisorProfileComplete(user?.advisorProfile)) return <AdvisorProfileRequiredDialog />;
-  const [currencyByType, formOptions] = await Promise.all([getContractCurrencies(), getContractFormOptions()]);
+  const [currencyByType, currencyCatalog, formOptions] = await Promise.all([getContractCurrencies(), getCurrencyCatalog(), getContractFormOptions()]);
   return (
     <div className="mx-auto w-full max-w-none space-y-5">
-      <ContractForm advisorProfile={user?.advisorProfile} currencyByType={currencyByType} formOptions={formOptions} canManageState={false} evidenceSessionId={crypto.randomUUID()} />
+      <ContractForm advisorProfile={user?.advisorProfile} currencyByType={currencyByType} currencyCatalog={currencyCatalog} formOptions={formOptions} canManageState={false} evidenceSessionId={crypto.randomUUID()} />
     </div>
   );
 }

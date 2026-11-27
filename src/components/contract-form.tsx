@@ -6,6 +6,7 @@ import { saveContract, FormState } from "@/app/actions";
 import { amountInWords } from "@/lib/amount-in-words";
 import { validityInWords, type ContractValidityUnit } from "@/lib/contract-validity";
 import { CONTRACT_TYPES, CURRENCY_NAMES, CURRENCY_SYMBOLS, isTemplateBasedContract, STATES, type Currency } from "@/lib/contract-types";
+import type { CurrencyDefinition } from "@/lib/contract-currencies";
 import type { AdditionalContractOwner, Contract } from "@/lib/contracts";
 import type { AdvisorProfile } from "@/lib/users";
 import { MIN_CONTRACT_EVIDENCE_IMAGES } from "@/lib/contract-evidence-constants";
@@ -45,7 +46,7 @@ function SectionIcon({ type }: { type: "contract" | "owner" | "property" | "amou
   </span>;
 }
 
-export function ContractForm({ contract, advisorProfile, currencyByType, formOptions, canManageState = true, evidenceSessionId }: { contract?: Contract; advisorProfile?: AdvisorProfile; currencyByType?: Record<string, Currency>; formOptions?: ContractFormOptions; canManageState?: boolean; evidenceSessionId?: string }) {
+export function ContractForm({ contract, advisorProfile, currencyByType, currencyCatalog = [], formOptions, canManageState = true, evidenceSessionId }: { contract?: Contract; advisorProfile?: AdvisorProfile; currencyByType?: Record<string, Currency>; currencyCatalog?: CurrencyDefinition[]; formOptions?: ContractFormOptions; canManageState?: boolean; evidenceSessionId?: string }) {
   const [tipo, setTipo] = useState(contract?.tipo ?? CONTRACT_TYPES[0].id);
   const [monto, setMonto] = useState(contract ? String(contract.monto) : "");
   const [vigenciaCantidad, setVigenciaCantidad] = useState(contract?.vigenciaCantidad ? String(contract.vigenciaCantidad) : "");
@@ -63,6 +64,10 @@ export function ContractForm({ contract, advisorProfile, currencyByType, formOpt
   const extras = contractType?.extras ?? [];
   const templateBased = isTemplateBasedContract(tipo);
   const selectedCurrency = (contract?.moneda ?? currencyByType?.[tipo] ?? "BOB") as Currency;
+  const selectedCurrencyDefinition = currencyCatalog.find((item) => item.code === selectedCurrency);
+  const currencyName = contract?.monedaNombre ?? selectedCurrencyDefinition?.name ?? CURRENCY_NAMES[selectedCurrency] ?? selectedCurrency;
+  const currencySingular = contract?.monedaSingular ?? selectedCurrencyDefinition?.singularName;
+  const currencySymbol = contract?.monedaSimbolo ?? selectedCurrencyDefinition?.symbol ?? CURRENCY_SYMBOLS[selectedCurrency] ?? selectedCurrency;
   const selectedProfile = contract?.asesorProfileSnapshot ?? advisorProfile;
   const propertyTypes = formOptions?.propertyTypes ?? [...DEFAULT_PROPERTY_TYPES];
   const identityCities = formOptions?.identityCities ?? [...DEFAULT_IDENTITY_CITIES];
@@ -71,7 +76,7 @@ export function ContractForm({ contract, advisorProfile, currencyByType, formOpt
   const today = new Date().toISOString().slice(0, 10);
   const sections = [...new Set(extras.map((field) => field.section ?? "Datos adicionales"))];
   const amountLabel = tipo === "exclusiva-alquiler" ? "Canon de arrendamiento mensual" : tipo === "exclusiva-anticretico" ? "Monto referencial de anticrético" : tipo === "exclusiva-rural" ? "Precio total referencial" : "Precio referencial de venta";
-  const amountWords = amountInWords(monto, selectedCurrency);
+  const amountWords = amountInWords(monto, selectedCurrency, currencySingular, currencyName);
   const validityWords = validityInWords(Number(vigenciaCantidad), vigenciaUnidad);
   const firstValidationError = Object.values(fieldValidation).find((item) => item.status === "error");
 
@@ -186,8 +191,8 @@ export function ContractForm({ contract, advisorProfile, currencyByType, formOpt
             <div className="flex flex-col gap-2 sm:flex-row">
               <input type="hidden" name="moneda" value={selectedCurrency} />
               <div className="input flex shrink-0 flex-col justify-center bg-white sm:w-44 dark:bg-carbon-900" aria-label={`Divisa ${selectedCurrency}`}>
-                <span className="text-sm font-semibold">{selectedCurrency} · {CURRENCY_SYMBOLS[selectedCurrency as Currency]}</span>
-                <span className="text-[10px] text-ink-mute dark:text-carbon-400">{CURRENCY_NAMES[selectedCurrency as Currency]}</span>
+                <span className="text-sm font-semibold">{selectedCurrency} · {currencySymbol}</span>
+                <span className="text-[10px] text-ink-mute dark:text-carbon-400">{currencyName}</span>
               </div>
               <input id="monto" name="monto" type="number" step="0.01" min="0" value={monto} onChange={(event) => setMonto(event.target.value)} className={`input ${validationClass("monto")}`} placeholder="Ej.: 300000" aria-invalid={fieldValidation.monto?.status === "error"} aria-describedby={fieldValidation.monto ? "montoFeedback" : undefined} required />
               {fieldFeedback("monto")}

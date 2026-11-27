@@ -135,17 +135,19 @@ export const STATES = [
   { id: "anulado", label: "Anulado" },
 ] as const;
 
-export const CURRENCIES = ["BOB", "USD"] as const;
-export type Currency = (typeof CURRENCIES)[number];
+/** Currency codes are managed by administrators and follow the ISO 4217 three-letter format. */
+export type Currency = string;
 
-export const CURRENCY_NAMES: Record<Currency, string> = {
+export const CURRENCY_NAMES: Record<string, string> = {
   BOB: "Bolivianos",
   USD: "Dólares Americanos",
+  PYG: "Guaraníes Paraguayos",
 };
 
-export const CURRENCY_SYMBOLS: Record<Currency, string> = {
+export const CURRENCY_SYMBOLS: Record<string, string> = {
   BOB: "Bs.",
   USD: "$us",
+  PYG: "₲",
 };
 
 export const TEMPLATE_CONTRACT_TYPES = CONTRACT_TYPES.filter((t) => t.templateBased);

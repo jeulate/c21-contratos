@@ -8,6 +8,7 @@ import { ContractDocumentPreview } from "@/components/contract-document-preview"
 import { ContractEvidenceGallery } from "@/components/contract-evidence-gallery";
 import { ContractDetailsSummary } from "@/components/contract-details-summary";
 import { getContractFormOptions } from "@/lib/contract-form-options";
+import { getCurrencyCatalog } from "@/lib/contract-currencies";
 
 export default async function ContratoPage({ params }: { params: Promise<{ id: string }> }) {
   const s = await requireSession();
@@ -15,7 +16,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
   const { id } = await params;
   const c = await getContract(id);
   if (!c || (!isStaff(s) && c.asesor !== s.username)) notFound();
-  const formOptions = await getContractFormOptions();
+  const [formOptions, currencyCatalog] = await Promise.all([getContractFormOptions(), getCurrencyCatalog()]);
   const observations = c.observations?.length ? c.observations : c.observacion ? [{
     id: `legacy-${c.id}`,
     message: c.observacion,
@@ -84,7 +85,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
       </div>
       {staff && <ContractEvidenceGallery contractId={c.id} evidencias={c.evidencias ?? []} />}
       {s.role === "asesor" && c.estado === "firmado" && c.evidencias?.length ? <ContractEvidenceGallery contractId={c.id} evidencias={c.evidencias ?? []} /> : null}
-      {s.role === "asesor" && c.estado !== "anulado" && c.estado !== "firmado" && <ContractForm contract={c} formOptions={formOptions} canManageState={false} />}
+      {s.role === "asesor" && c.estado !== "anulado" && c.estado !== "firmado" && <ContractForm contract={c} currencyCatalog={currencyCatalog} formOptions={formOptions} canManageState={false} />}
       {s.role === "asesor" && c.estado !== "firmado" && c.templateVersionId && <ContractDocumentPreview contractId={c.id} canDownload={false} />}
       {s.role === "asesor" && !c.templateVersionId && <section className="panel p-5">
         <h2 className="text-sm font-semibold text-ink dark:text-white">Vista previa Word</h2>
