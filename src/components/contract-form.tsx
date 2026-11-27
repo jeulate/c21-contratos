@@ -9,7 +9,7 @@ import { CONTRACT_TYPES, CURRENCY_NAMES, CURRENCY_SYMBOLS, isTemplateBasedContra
 import type { AdditionalContractOwner, Contract } from "@/lib/contracts";
 import type { AdvisorProfile } from "@/lib/users";
 import { MIN_CONTRACT_EVIDENCE_IMAGES } from "@/lib/contract-evidence-constants";
-import { DEFAULT_COUNTRY_CALLING_CODES, DEFAULT_IDENTITY_CITIES, DEFAULT_PROPERTY_TYPES, type ContractFormOptions } from "@/lib/contract-form-option-defaults";
+import { DEFAULT_COUNTRY_CALLING_CODES, DEFAULT_IDENTITY_CITIES, DEFAULT_PROPERTY_TYPES, DEFAULT_VALIDITY_UNITS, type ContractFormOptions } from "@/lib/contract-form-option-defaults";
 import { SubmitButton } from "./submit-button";
 import { ContractEvidenceUploader } from "./contract-evidence-uploader";
 import { CorporateSelect } from "./corporate-select";
@@ -49,7 +49,7 @@ export function ContractForm({ contract, advisorProfile, currencyByType, formOpt
   const [tipo, setTipo] = useState(contract?.tipo ?? CONTRACT_TYPES[0].id);
   const [monto, setMonto] = useState(contract ? String(contract.monto) : "");
   const [vigenciaCantidad, setVigenciaCantidad] = useState(contract?.vigenciaCantidad ? String(contract.vigenciaCantidad) : "");
-  const [vigenciaUnidad, setVigenciaUnidad] = useState<ContractValidityUnit>(contract?.vigenciaUnidad ?? "meses");
+  const [vigenciaUnidad, setVigenciaUnidad] = useState<ContractValidityUnit>(contract?.vigenciaUnidad ?? formOptions?.validityUnits[0] ?? DEFAULT_VALIDITY_UNITS[0]);
   const [evidenceIds, setEvidenceIds] = useState<string[]>([]);
   const [additionalOwners, setAdditionalOwners] = useState<AdditionalContractOwner[]>(contract?.additionalOwners ?? []);
   const [evidenceUploading, setEvidenceUploading] = useState(false);
@@ -66,6 +66,7 @@ export function ContractForm({ contract, advisorProfile, currencyByType, formOpt
   const selectedProfile = contract?.asesorProfileSnapshot ?? advisorProfile;
   const propertyTypes = formOptions?.propertyTypes ?? [...DEFAULT_PROPERTY_TYPES];
   const identityCities = formOptions?.identityCities ?? [...DEFAULT_IDENTITY_CITIES];
+  const validityUnits = formOptions?.validityUnits ?? [...DEFAULT_VALIDITY_UNITS];
   const countryCallingCodes = formOptions?.countryCallingCodes ?? DEFAULT_COUNTRY_CALLING_CODES;
   const today = new Date().toISOString().slice(0, 10);
   const sections = [...new Set(extras.map((field) => field.section ?? "Datos adicionales"))];
@@ -195,7 +196,7 @@ export function ContractForm({ contract, advisorProfile, currencyByType, formOpt
             <label className="label" htmlFor="vigenciaCantidad">Vigencia del contrato</label>
             <div className="grid grid-cols-[minmax(0,1fr)_minmax(130px,0.8fr)] gap-2">
               <input id="vigenciaCantidad" name="vigenciaCantidad" type="number" min="1" max="36500" step="1" inputMode="numeric" value={vigenciaCantidad} onChange={(event) => setVigenciaCantidad(event.target.value)} className={`input ${validationClass("vigenciaCantidad")}`} placeholder="Ej.: 4" aria-invalid={fieldValidation.vigenciaCantidad?.status === "error"} aria-describedby={fieldValidation.vigenciaCantidad ? "vigenciaCantidadFeedback" : "vigenciaCantidadHelp"} required />
-              <CorporateSelect id="vigenciaUnidad" name="vigenciaUnidad" value={vigenciaUnidad} onValueChange={(value) => setVigenciaUnidad(value as ContractValidityUnit)} options={[{ value: "dias", label: "Días" }, { value: "meses", label: "Meses" }, { value: "años", label: "Años" }]} required />
+              <CorporateSelect id="vigenciaUnidad" name="vigenciaUnidad" value={vigenciaUnidad} onValueChange={(value) => setVigenciaUnidad(value as ContractValidityUnit)} options={[...new Set([...validityUnits, ...(contract?.vigenciaUnidad ? [contract.vigenciaUnidad] : [])])].map((unit) => ({ value: unit, label: unit === "dias" ? "Días" : unit === "meses" ? "Meses" : "Años" }))} required />
             </div>
             {fieldFeedback("vigenciaCantidad")}
             <p id="vigenciaCantidadHelp" className="mt-1 text-xs text-ink-mute dark:text-carbon-400">La fecha de vencimiento se calcula desde la fecha del contrato.</p>

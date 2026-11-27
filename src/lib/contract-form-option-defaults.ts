@@ -1,4 +1,7 @@
+import type { ContractValidityUnit } from "./contract-validity";
+
 export const DEFAULT_PROPERTY_TYPES = ["Casa", "Departamento"] as const;
+export const DEFAULT_VALIDITY_UNITS: ContractValidityUnit[] = ["dias", "meses", "años"];
 export const DEFAULT_IDENTITY_CITIES = [
   "Santa Cruz de la Sierra",
   "La Paz",
@@ -29,4 +32,5 @@ export type ContractFormOptions = {
   propertyTypes: string[];
   identityCities: string[];
   countryCallingCodes: CountryCallingCode[];
+  validityUnits: ContractValidityUnit[];
 };

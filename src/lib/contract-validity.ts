@@ -1,7 +1,12 @@
 import { integerCountInWords } from "./amount-in-words";
 
 export const UPCOMING_EXPIRY_WINDOW_DAYS = 30;
-export type ContractValidityUnit = "dias" | "meses" | "años";
+export const CONTRACT_VALIDITY_UNITS = ["dias", "meses", "años"] as const;
+export type ContractValidityUnit = (typeof CONTRACT_VALIDITY_UNITS)[number];
+
+export function isContractValidityUnit(value: unknown): value is ContractValidityUnit {
+  return typeof value === "string" && CONTRACT_VALIDITY_UNITS.some((unit) => unit === value);
+}
 
 export function validityUnitLabel(quantity: number, unit: ContractValidityUnit): string {
   if (unit === "dias") return quantity === 1 ? "día calendario" : "días calendario";
