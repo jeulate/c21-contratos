@@ -20,6 +20,9 @@ export type Contract = {
   propiedad: string;
   monto: number;
   moneda: string;
+  monedaNombre?: string;
+  monedaSingular?: string;
+  monedaSimbolo?: string;
   fecha: string; // yyyy-mm-dd
   vigenciaCantidad?: number;
   vigenciaUnidad?: "dias" | "meses" | "años";
