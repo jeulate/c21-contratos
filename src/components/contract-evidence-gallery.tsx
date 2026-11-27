@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import type { ContractEvidence } from "@/lib/contract-evidence";
 
-export function ContractEvidenceGallery({ contractId, evidencias }: { contractId: string; evidencias: ContractEvidence[] }) {
+export function ContractEvidenceGallery({ contractId, evidencias, title = "Documentación de respaldo", showUploadDetails = false }: { contractId: string; evidencias: ContractEvidence[]; title?: string; showUploadDetails?: boolean }) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [zoom, setZoom] = useState(1);
   const [naturalSize, setNaturalSize] = useState<{ width: number; height: number } | null>(null);
@@ -55,7 +55,7 @@ export function ContractEvidenceGallery({ contractId, evidencias }: { contractId
     <section className="panel space-y-4 p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-ink dark:text-white">Documentación de respaldo</h2>
+          <h2 className="text-sm font-semibold text-ink dark:text-white">{title}</h2>
           <p className="mt-1 text-xs text-ink-mute dark:text-carbon-400">Selecciona una imagen para ampliarla y revisar sus detalles sin salir del contrato.</p>
         </div>
         <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-ink-soft dark:bg-carbon-800 dark:text-carbon-200">{evidencias.length} imágenes</span>
@@ -70,6 +70,7 @@ export function ContractEvidenceGallery({ contractId, evidencias }: { contractId
               <div className="px-3 py-2.5">
                 <p className="truncate text-xs font-medium text-ink dark:text-carbon-100">{evidence.fileName}</p>
                 <p className="mt-1 text-[11px] text-ink-mute dark:text-carbon-400">{(evidence.size / 1024).toFixed(0)} KB · Imagen {index + 1}</p>
+                {showUploadDetails && <p className="mt-1 text-[11px] text-ink-mute dark:text-carbon-400">{evidence.uploadedByName ?? evidence.uploadedBy ?? "Usuario"} · {new Date(evidence.uploadedAt).toLocaleString("es-BO")}</p>}
               </div>
             </li>
           );

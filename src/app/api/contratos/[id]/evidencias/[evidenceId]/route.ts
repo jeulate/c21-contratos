@@ -12,11 +12,13 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   const { id, evidenceId } = await params;
   const contract = await getContract(id);
   if (!contract || (!isStaff(session) && contract.asesor !== session.username)) return new NextResponse("Contrato no encontrado", { status: 404 });
-  const evidence = contract.evidencias?.find((item) => item.id === evidenceId);
+  const initialEvidence = contract.evidencias?.find((item) => item.id === evidenceId);
+  const signedEvidence = contract.evidenciasFirmadas?.find((item) => item.id === evidenceId);
+  const evidence = initialEvidence ?? signedEvidence;
   if (!evidence) return new NextResponse("Imagen no encontrada", { status: 404 });
 
   try {
-    const file = await readContractEvidenceFile(contract.id, evidence);
+    const file = await readContractEvidenceFile(contract.id, evidence, Boolean(signedEvidence));
     return new NextResponse(new Uint8Array(file), {
       headers: {
         "Content-Type": evidence.mimeType,

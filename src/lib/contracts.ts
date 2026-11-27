@@ -10,6 +10,7 @@ export type Contract = {
   observacion?: string;
   observations?: ContractObservation[];
   evidencias?: ContractEvidence[];
+  evidenciasFirmadas?: ContractEvidence[];
   asesor: string; // username
   asesorNombre: string;
   asesorProfileSnapshot?: AdvisorProfile;
@@ -129,6 +130,26 @@ export async function updateContract(id: string, input: ContractInput, by: strin
     updatedAt: now,
     updatedBy: by,
     history: [...prev.history, { at: now, by, changes: changes.map((c) => `Editó ${c}`) }].slice(-50),
+  };
+  await redis.set(ck(id), next);
+  return next;
+}
+
+export async function appendSignedContractEvidence(id: string, evidence: ContractEvidence, by: string, byName: string) {
+  const contract = await getContract(id);
+  if (!contract) throw new Error("Contrato no encontrado.");
+  if (contract.estado !== "firmado") throw new Error("Las fotografías finales solo se pueden adjuntar a contratos firmados.");
+  const current = contract.evidenciasFirmadas ?? [];
+  if (current.length >= 20) throw new Error("Este contrato ya alcanzó el máximo de 20 fotografías firmadas.");
+  if (current.some((item) => item.id === evidence.id)) throw new Error("La imagen ya está asociada al contrato.");
+
+  const now = new Date().toISOString();
+  const next: Contract = {
+    ...contract,
+    evidenciasFirmadas: [...current, { ...evidence, uploadedBy: by, uploadedByName: byName }],
+    updatedAt: now,
+    updatedBy: by,
+    history: [...contract.history, { at: now, by, changes: [`Adjuntó fotografía del contrato firmado: ${evidence.fileName}`] }].slice(-50),
   };
   await redis.set(ck(id), next);
   return next;
