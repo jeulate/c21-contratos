@@ -38,6 +38,98 @@ function collectPdfCssRules(rules: CSSRuleList): string {
   return css;
 }
 
+function preserveTemplateAlignment(source: HTMLElement, copy: HTMLElement) {
+  const sourceElements = [source, ...Array.from(source.querySelectorAll<HTMLElement>("*"))];
+  const copiedElements = [copy, ...Array.from(copy.querySelectorAll<HTMLElement>("*"))];
+  const sourceWindow = source.ownerDocument.defaultView;
+  if (!sourceWindow || sourceElements.length !== copiedElements.length) return;
+
+  sourceElements.forEach((element, index) => {
+    if (sourceWindow.getComputedStyle(element).textAlign === "center") {
+      copiedElements[index].classList.add("c21-pdf-template-centered");
+    }
+  });
+}
+
+function preparePdfContractAlignment(contract: HTMLElement) {
+  const normalizedText = (element: HTMLElement) => (element.innerText || element.textContent || "").replace(/\s+/g, " ").trim();
+  const textBlocks = Array.from(contract.querySelectorAll<HTMLElement>(
+    "h1,h2,h3,h4,h5,h6,p,li,td,th,blockquote,div",
+  )).filter((element) => {
+    if (element.tagName !== "DIV") return true;
+    const containsTextBlock = element.querySelector("h1,h2,h3,h4,h5,h6,p,li,td,th,blockquote");
+    const hasDirectText = Array.from(element.childNodes).some(
+      (node) => node.nodeType === Node.TEXT_NODE && Boolean(node.textContent?.trim()),
+    );
+    return !containsTextBlock || hasDirectText;
+  });
+
+  const title = textBlocks.find((element) =>
+    /^CONTRATO\b/i.test(normalizedText(element)) && normalizedText(element).length < 180,
+  );
+  title?.classList.add("c21-pdf-contract-title");
+
+  const explicitSignatureBlocks = contract.querySelectorAll<HTMLElement>(
+    ".c21-contract-signatures,[data-c21-signatures]",
+  );
+  explicitSignatureBlocks.forEach((element) => element.classList.add("c21-pdf-signature-block"));
+
+  const hasExplicitSignatures = explicitSignatureBlocks.length > 0;
+  if (!hasExplicitSignatures) {
+    const isRoleLabel = (element: HTMLElement) =>
+      /^(?:EL|LA)\s+(?:PROPIETARIO|PROPIETARIA|ASESOR|ASESORA)\s*[:.-]?\s*_*$/i.test(normalizedText(element));
+    const roleLabels = textBlocks.filter(isRoleLabel);
+    const signatureStart = roleLabels.at(0);
+
+    if (signatureStart) {
+      const signatureIndex = textBlocks.indexOf(signatureStart);
+      for (const element of textBlocks.slice(signatureIndex)) {
+        element.classList.add("c21-pdf-signature-block");
+      }
+      const dateBlock = textBlocks.slice(0, signatureIndex).reverse().find((element) =>
+        /\b\d{1,2}\s+de\s+[a-záéíóú]+\s+de\s+\d{4}\b/i.test(normalizedText(element)),
+      );
+      dateBlock?.classList.add("c21-pdf-signature-block");
+
+      const isSignatureRule = (element: HTMLElement) => {
+        const text = normalizedText(element);
+        if (/^[_\u2014\u2013\-\s]{3,}$/.test(text) || element.querySelector("hr")) return true;
+        const elements = [element, ...Array.from(element.querySelectorAll<HTMLElement>("*"))];
+        return elements.some((candidate) => {
+          const style = candidate.ownerDocument.defaultView?.getComputedStyle(candidate);
+          return Boolean(style && style.borderBottomStyle !== "none" && Number.parseFloat(style.borderBottomWidth) > 0);
+        });
+      };
+
+      for (const label of roleLabels) {
+        const labelRow = label.closest("tr");
+        const table = label.closest("table");
+        if (labelRow && table) {
+          const rows = Array.from(table.querySelectorAll("tr"));
+          const labelRowIndex = rows.indexOf(labelRow);
+          const ruleRow = rows.slice(labelRowIndex + 1, labelRowIndex + 4).find((row) => {
+            const cells = Array.from(row.querySelectorAll<HTMLElement>("td,th"));
+            const hasRule = cells.some(isSignatureRule);
+            return hasRule && cells.length > 0 && cells.every((cell) => !normalizedText(cell) || isSignatureRule(cell));
+          });
+          const rowParent = labelRow.parentElement;
+          if (ruleRow && rowParent && rowParent === ruleRow.parentElement) {
+            ruleRow.classList.add("c21-pdf-signature-block");
+            rowParent.insertBefore(ruleRow, labelRow);
+          }
+          continue;
+        }
+
+        const labelParent = label.parentElement;
+        const followingRule = labelParent && Array.from(labelParent.children)
+          .slice(Array.from(labelParent.children).indexOf(label) + 1)
+          .find((element): element is HTMLElement => isSignatureRule(element as HTMLElement));
+        if (labelParent && followingRule) labelParent.insertBefore(followingRule, label);
+      }
+    }
+  }
+}
+
 export function ContractDocumentPreview({ contractId, canDownload = true }: { contractId: string; canDownload?: boolean }) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const styleRef = useRef<HTMLDivElement>(null);
@@ -93,8 +185,24 @@ export function ContractDocumentPreview({ contractId, canDownload = true }: { co
   }
 
   function printHtml() {
-    htmlFrameRef.current?.contentWindow?.focus();
-    htmlFrameRef.current?.contentWindow?.print();
+    const frameWindow = htmlFrameRef.current?.contentWindow;
+    const frameDocument = htmlFrameRef.current?.contentDocument;
+    const contract = frameDocument?.querySelector<HTMLElement>(".c21-print-document");
+    if (contract && frameDocument) {
+      preparePdfContractAlignment(contract);
+      let style = frameDocument.getElementById("c21-print-signature-alignment") as HTMLStyleElement | null;
+      if (!style) {
+        style = frameDocument.createElement("style");
+        style.id = "c21-print-signature-alignment";
+        frameDocument.head.appendChild(style);
+      }
+      style.textContent = `
+        .c21-pdf-contract-title { text-align: center !important; }
+        .c21-pdf-signature-block, .c21-pdf-signature-block * { text-align: center !important; }
+      `;
+    }
+    frameWindow?.focus();
+    frameWindow?.print();
   }
 
   function printWordPreview() {
@@ -120,12 +228,14 @@ export function ContractDocumentPreview({ contractId, canDownload = true }: { co
     setDownloadingPdf(true);
     setError("");
     let pdfRoot: HTMLDivElement | null = null;
+    let pdfMain: HTMLElement | null = null;
+    const headerLogos: Array<{ data: string; side: "left" | "right"; aspectRatio: number }> = [];
     try {
       const html2pdf = (await import("html2pdf.js")).default;
       pdfRoot = document.createElement("div");
       pdfRoot.className = "c21-pdf-export";
       Object.assign(pdfRoot.style, {
-        position: "fixed",
+        position: "absolute",
         top: "0",
         left: "0",
         width: "210mm",
@@ -134,6 +244,7 @@ export function ContractDocumentPreview({ contractId, canDownload = true }: { co
         overflow: "visible",
         background: "#fff",
         color: "#111",
+        opacity: "0",
         zIndex: "-1",
       });
 
@@ -143,19 +254,67 @@ export function ContractDocumentPreview({ contractId, canDownload = true }: { co
         const style = document.createElement("style");
         style.textContent = Array.from(sourceDocument.styleSheets).map((sheet) => {
           try { return collectPdfCssRules(sheet.cssRules); } catch { return ""; }
-        }).join("\n");
+        }).join("\n") + `
+          .c21-pdf-export .c21-print-document {
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            line-height: 1.5 !important;
+            text-align: justify !important;
+            overflow: visible !important;
+          }
+          .c21-pdf-export .c21-print-document p,
+          .c21-pdf-export .c21-print-document li,
+          .c21-pdf-export .c21-print-document td,
+          .c21-pdf-export .c21-print-document th,
+          .c21-pdf-export .c21-print-document blockquote {
+            line-height: 1.5 !important;
+            text-align: justify !important;
+            margin-block-start: 0 !important;
+            margin-block-end: 1.5em !important;
+            break-inside: avoid-page !important;
+            page-break-inside: avoid !important;
+            orphans: 3;
+            widows: 3;
+          }
+          .c21-pdf-export .c21-print-document h1,
+          .c21-pdf-export .c21-print-document h2,
+          .c21-pdf-export .c21-print-document h3,
+          .c21-pdf-export .c21-print-document h4,
+          .c21-pdf-export .c21-print-document h5,
+          .c21-pdf-export .c21-print-document h6 {
+            line-height: 1.5 !important;
+            break-after: avoid-page !important;
+            page-break-after: avoid !important;
+          }
+          .c21-pdf-export .c21-print-document .c21-pdf-template-centered,
+          .c21-pdf-export .c21-print-document .c21-pdf-template-centered * {
+            text-align: center !important;
+          }
+          .c21-pdf-export .c21-print-document .c21-pdf-contract-title {
+            text-align: center !important;
+          }
+          .c21-pdf-export .c21-print-document .c21-pdf-signature-block,
+          .c21-pdf-export .c21-print-document .c21-pdf-signature-block * {
+            text-align: center !important;
+          }
+          .c21-pdf-export .c21-print-document > .c21-print-header { display: none !important; }
+        `;
         pdfRoot.appendChild(style);
         const watermark = sourceDocument.body.querySelector(".c21-print-watermark")?.cloneNode(true);
         if (watermark) pdfRoot.appendChild(watermark);
         const main = sourceDocument.body.querySelector(".c21-print-document")?.cloneNode(true);
-        if (!main) throw new Error("No se encontró el contenido del contrato para generar el PDF.");
-        pdfRoot.appendChild(main);
+        if (!main || main.nodeType !== Node.ELEMENT_NODE) throw new Error("No se encontró el contenido del contrato para generar el PDF.");
+        pdfMain = main as HTMLElement;
+        const sourceMain = sourceDocument.body.querySelector<HTMLElement>(".c21-print-document");
+        if (sourceMain) preserveTemplateAlignment(sourceMain, pdfMain);
+        pdfRoot.appendChild(pdfMain);
       } else {
         if (!bodyRef.current || !styleRef.current) throw new Error("La vista previa Word todavía no está lista.");
         pdfRoot.innerHTML = `${styleRef.current.innerHTML}${bodyRef.current.innerHTML}`;
       }
 
       document.body.appendChild(pdfRoot);
+      if (pdfMain) preparePdfContractAlignment(pdfMain);
       await document.fonts.ready;
       await Promise.all(Array.from(pdfRoot.querySelectorAll("img")).map(async (image) => {
         if (!image.complete) await new Promise<void>((resolve) => {
@@ -167,16 +326,62 @@ export function ContractDocumentPreview({ contractId, canDownload = true }: { co
         }
       }));
 
+      if (htmlDocument) {
+        for (const image of Array.from(pdfRoot.querySelectorAll<HTMLImageElement>(".c21-print-header img"))) {
+          if (!image.complete || image.naturalWidth === 0 || image.naturalHeight === 0) continue;
+          const canvas = document.createElement("canvas");
+          canvas.width = image.naturalWidth;
+          canvas.height = image.naturalHeight;
+          const context = canvas.getContext("2d");
+          if (!context) continue;
+          context.drawImage(image, 0, 0);
+          headerLogos.push({
+            data: canvas.toDataURL("image/png"),
+            side: image.classList.contains("c21-print-header__right") ? "right" : "left",
+            aspectRatio: image.naturalWidth / image.naturalHeight,
+          });
+        }
+      }
+
       const scale = Math.max(1, Math.min(2, Math.sqrt(24_000_000 / Math.max(1, pdfRoot.scrollWidth * pdfRoot.scrollHeight))));
       const options = {
-        margin: 0,
+        margin: [22, 0, 20, 0] as [number, number, number, number],
         filename: `contrato-${contractId.replace(/[^a-zA-Z0-9_-]/g, "-")}.pdf`,
         image: { type: "jpeg" as const, quality: 0.98 },
-        html2canvas: { scale, useCORS: true, allowTaint: false, backgroundColor: "#ffffff", logging: false },
+        html2canvas: {
+          scale,
+          useCORS: true,
+          allowTaint: false,
+          backgroundColor: "#ffffff",
+          logging: false,
+          onclone: (clonedDocument: Document) => {
+            const clonedRoot = clonedDocument.querySelector<HTMLElement>(".html2pdf__container .c21-pdf-export");
+            if (!clonedRoot) return;
+            clonedRoot.style.position = "relative";
+            clonedRoot.style.top = "auto";
+            clonedRoot.style.left = "auto";
+            clonedRoot.style.opacity = "1";
+            clonedRoot.style.zIndex = "auto";
+          },
+        },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" as const },
-        pagebreak: { mode: ["css", "legacy"] },
+        pagebreak: { mode: ["css", "legacy"], avoid: ["p", "li", "tr", "img", "h1", "h2", "h3", "h4", "h5", "h6"] },
       };
-      await html2pdf().set(options).from(pdfRoot).save();
+      const worker = html2pdf().set(options).from(pdfRoot);
+      await worker.toPdf();
+      const pdf = await worker.get("pdf");
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      for (let page = 1; page <= pdf.getNumberOfPages(); page++) {
+        pdf.setPage(page);
+        for (const logo of headerLogos) {
+          const maxWidth = logo.side === "left" ? 46 : 12;
+          const width = Math.min(maxWidth, 11 * logo.aspectRatio);
+          const height = width / logo.aspectRatio;
+          const x = logo.side === "left" ? 20 : pageWidth - 20 - width;
+          pdf.addImage(logo.data, "PNG", x, 7, width, height);
+        }
+      }
+      await worker.save();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No se pudo generar el archivo PDF.");
     } finally {
