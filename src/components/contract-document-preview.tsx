@@ -38,6 +38,19 @@ function collectPdfCssRules(rules: CSSRuleList): string {
   return css;
 }
 
+function preserveTemplateAlignment(source: HTMLElement, copy: HTMLElement) {
+  const sourceElements = [source, ...Array.from(source.querySelectorAll<HTMLElement>("*"))];
+  const copiedElements = [copy, ...Array.from(copy.querySelectorAll<HTMLElement>("*"))];
+  const sourceWindow = source.ownerDocument.defaultView;
+  if (!sourceWindow || sourceElements.length !== copiedElements.length) return;
+
+  sourceElements.forEach((element, index) => {
+    if (sourceWindow.getComputedStyle(element).textAlign === "center") {
+      copiedElements[index].classList.add("c21-pdf-template-centered");
+    }
+  });
+}
+
 function preparePdfContractAlignment(contract: HTMLElement) {
   const normalizedText = (element: HTMLElement) => (element.innerText || element.textContent || "").replace(/\s+/g, " ").trim();
   const textBlocks = Array.from(contract.querySelectorAll<HTMLElement>(
@@ -273,6 +286,10 @@ export function ContractDocumentPreview({ contractId, canDownload = true }: { co
             break-after: avoid-page !important;
             page-break-after: avoid !important;
           }
+          .c21-pdf-export .c21-print-document .c21-pdf-template-centered,
+          .c21-pdf-export .c21-print-document .c21-pdf-template-centered * {
+            text-align: center !important;
+          }
           .c21-pdf-export .c21-print-document .c21-pdf-contract-title {
             text-align: center !important;
           }
@@ -288,6 +305,8 @@ export function ContractDocumentPreview({ contractId, canDownload = true }: { co
         const main = sourceDocument.body.querySelector(".c21-print-document")?.cloneNode(true);
         if (!main || main.nodeType !== Node.ELEMENT_NODE) throw new Error("No se encontró el contenido del contrato para generar el PDF.");
         pdfMain = main as HTMLElement;
+        const sourceMain = sourceDocument.body.querySelector<HTMLElement>(".c21-print-document");
+        if (sourceMain) preserveTemplateAlignment(sourceMain, pdfMain);
         pdfRoot.appendChild(pdfMain);
       } else {
         if (!bodyRef.current || !styleRef.current) throw new Error("La vista previa Word todavía no está lista.");
