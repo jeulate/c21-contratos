@@ -2,10 +2,15 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { ContractEvidence } from "@/lib/contract-evidence";
 
-export function ContractEvidenceGallery({ contractId, evidencias }: { contractId: string; evidencias: ContractEvidence[] }) {
+export function ContractEvidenceGallery({ contractId, evidencias, title = "Documentación de respaldo", showUploadDetails = false, canRequestReplacement = false }: { contractId: string; evidencias: ContractEvidence[]; title?: string; showUploadDetails?: boolean; canRequestReplacement?: boolean }) {
+  const router = useRouter();
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const [replacementTarget, setReplacementTarget] = useState<ContractEvidence | null>(null);
+  const [replacementError, setReplacementError] = useState("");
+  const [requestingReplacement, setRequestingReplacement] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [naturalSize, setNaturalSize] = useState<{ width: number; height: number } | null>(null);
   const [viewerBounds, setViewerBounds] = useState({ width: 1200, height: 800 });
@@ -49,13 +54,29 @@ export function ContractEvidenceGallery({ contractId, evidencias }: { contractId
     setZoom(1);
   }
 
+  async function confirmReplacement() {
+    if (!replacementTarget || requestingReplacement) return;
+    setRequestingReplacement(true);
+    setReplacementError("");
+    try {
+      const response = await fetch(`/api/contratos/${encodeURIComponent(contractId)}/evidencias-firmadas/${encodeURIComponent(replacementTarget.id)}`, { method: "DELETE" });
+      if (!response.ok) throw new Error(await response.text() || "No se pudo solicitar el reemplazo.");
+      setReplacementTarget(null);
+      router.refresh();
+    } catch (error) {
+      setReplacementError(error instanceof Error ? error.message : "No se pudo solicitar el reemplazo.");
+    } finally {
+      setRequestingReplacement(false);
+    }
+  }
+
   if (!evidencias.length) return null;
 
   return (
     <section className="panel space-y-4 p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-ink dark:text-white">Documentación de respaldo</h2>
+          <h2 className="text-sm font-semibold text-ink dark:text-white">{title}</h2>
           <p className="mt-1 text-xs text-ink-mute dark:text-carbon-400">Selecciona una imagen para ampliarla y revisar sus detalles sin salir del contrato.</p>
         </div>
         <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-ink-soft dark:bg-carbon-800 dark:text-carbon-200">{evidencias.length} imágenes</span>
@@ -70,6 +91,8 @@ export function ContractEvidenceGallery({ contractId, evidencias }: { contractId
               <div className="px-3 py-2.5">
                 <p className="truncate text-xs font-medium text-ink dark:text-carbon-100">{evidence.fileName}</p>
                 <p className="mt-1 text-[11px] text-ink-mute dark:text-carbon-400">{(evidence.size / 1024).toFixed(0)} KB · Imagen {index + 1}</p>
+                {showUploadDetails && <p className="mt-1 text-[11px] text-ink-mute dark:text-carbon-400">{evidence.uploadedByName ?? evidence.uploadedBy ?? "Usuario"} · {new Date(evidence.uploadedAt).toLocaleString("es-BO")}</p>}
+                {canRequestReplacement && <button type="button" onClick={() => { setReplacementError(""); setReplacementTarget(evidence); }} className="mt-2 text-xs font-semibold text-red-700 underline underline-offset-2 hover:text-red-900 dark:text-red-300 dark:hover:text-red-200">Retirar y solicitar reemplazo</button>}
               </div>
             </li>
           );
@@ -110,6 +133,17 @@ export function ContractEvidenceGallery({ contractId, evidencias }: { contractId
             {evidencias.length > 1 && <button type="button" onClick={() => { setActiveIndex((activeIndex! + 1) % evidencias.length); setZoom(1); }} aria-label="Imagen siguiente" className="absolute right-2 z-10 rounded-full bg-black/60 px-4 py-3 text-xl hover:bg-black/80 sm:right-4">›</button>}
           </div>
         </div>
+      </div>}
+      {replacementTarget && <div role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !requestingReplacement) setReplacementTarget(null); }} className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4">
+        <section role="dialog" aria-modal="true" aria-labelledby="signed-evidence-replacement-title" className="w-full max-w-md rounded-2xl border border-stone-300 bg-white p-6 text-ink shadow-2xl dark:border-carbon-700 dark:bg-carbon-900 dark:text-white">
+          <h2 id="signed-evidence-replacement-title" className="text-base font-bold">Solicitar reemplazo de fotografía</h2>
+          <p className="mt-2 text-sm text-ink-soft dark:text-carbon-200">Se retirará «{replacementTarget.fileName}», se habilitará una nueva carga y se notificará al asesor para que adjunte otra imagen.</p>
+          {replacementError && <p role="alert" className="mt-3 text-sm text-red-700 dark:text-red-300">{replacementError}</p>}
+          <div className="mt-5 flex flex-wrap justify-end gap-2">
+            <button type="button" className="btn-ghost" disabled={requestingReplacement} onClick={() => setReplacementTarget(null)}>Cancelar</button>
+            <button type="button" className="btn" disabled={requestingReplacement} onClick={() => void confirmReplacement()}>{requestingReplacement ? "Procesando…" : "Retirar y notificar"}</button>
+          </div>
+        </section>
       </div>}
     </section>
   );

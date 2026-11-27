@@ -9,7 +9,7 @@ import { COOKIE, signSession, Role } from "@/lib/session";
 import { AdvisorProfile, checkPassword, createUser, getUser, patchUser } from "@/lib/users";
 import { isAdvisorProfileComplete } from "@/lib/advisor-profile";
 import { CONTRACT_TYPES, isTemplateBasedContract, STATES } from "@/lib/contract-types";
-import { changeContractState, ContractInput, createContract, getContract, listContracts, markSignedContractNotificationAsRead, updateContract, validateAdditionalOwners, validateExtras } from "@/lib/contracts";
+import { changeContractState, ContractInput, createContract, getContract, isSignedEvidenceSubmissionLocked, listContracts, markSignedContractNotificationAsRead, submitSignedContractEvidence, updateContract, validateAdditionalOwners, validateExtras } from "@/lib/contracts";
 import { activateTemplateVersion, createTemplateVersion, deleteTemplateVersion, getActiveTemplate, getTemplateVersion, listTemplateVersions } from "@/lib/contract-templates";
 import { getAdvisorCurrencyChangeAllowed, getContractCurrency, getCurrencyCatalog, getCurrencyDefinition, setAdvisorCurrencyChangeAllowed, setContractCurrency, setCurrencyDefinition } from "@/lib/contract-currencies";
 import { getContractFormOptions, setContractFormOptions } from "@/lib/contract-form-options";
@@ -18,7 +18,7 @@ import { setDashboardExchangeRate } from "@/lib/dashboard-settings";
 import { isContractValidityUnit, validityInWords } from "@/lib/contract-validity";
 import type { ContractFormOptions, CountryCallingCode } from "@/lib/contract-form-option-defaults";
 import { validateHtmlTemplateMarkers } from "@/lib/contract-html-document";
-import { finalizeStagedContractEvidence, isEvidenceIdentifier, MIN_CONTRACT_EVIDENCE_IMAGES, MAX_CONTRACT_EVIDENCE_IMAGES, removeContractEvidenceFiles, readAdvisorProfilePhoto } from "@/lib/contract-evidence";
+import { deleteSignedContractEvidenceFile, finalizeStagedContractEvidence, isEvidenceIdentifier, MIN_CONTRACT_EVIDENCE_IMAGES, MAX_CONTRACT_EVIDENCE_IMAGES, removeContractEvidenceFiles, readAdvisorProfilePhoto } from "@/lib/contract-evidence";
 import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
 import InspectModule from "docxtemplater/js/inspect-module.js";
@@ -433,6 +433,47 @@ export async function changeContractStateAction(id: string, _: FormState, fd: Fo
   revalidatePath("/contratos");
   revalidatePath(`/contratos/${id}`);
   return { ok: "Estado actualizado y registrado en el historial" };
+}
+
+export async function saveSignedContractEvidenceAction(id: string, fd: FormData): Promise<FormState> {
+  const session = await requireSession(["asesor"]);
+  const contract = await getContract(id);
+  if (!contract || contract.asesor !== session.username) return { error: "No se encontró el contrato o no tienes acceso para actualizarlo." };
+  if (contract.estado !== "firmado") return { error: "Solo puedes adjuntar fotografías cuando el contrato está firmado." };
+  if (isSignedEvidenceSubmissionLocked(contract)) return { error: "El respaldo está bloqueado. Solicita a Legal o Administración que habilite un reemplazo." };
+
+  const sessionId = String(fd.get("sessionId") ?? "");
+  if (!isEvidenceIdentifier(sessionId)) return { error: "La sesión de carga venció. Selecciona nuevamente las fotografías." };
+  let evidenceIds: string[];
+  try {
+    const submitted = JSON.parse(String(fd.get("evidenceIds") ?? "[]")) as unknown;
+    if (!Array.isArray(submitted) || submitted.some((value) => typeof value !== "string")) throw new Error();
+    evidenceIds = submitted;
+  } catch {
+    return { error: "No se pudo verificar la lista de fotografías. Vuelve a seleccionarlas." };
+  }
+  if (evidenceIds.length < 1 || evidenceIds.length > MAX_CONTRACT_EVIDENCE_IMAGES || new Set(evidenceIds).size !== evidenceIds.length || evidenceIds.some((value) => !isEvidenceIdentifier(value))) {
+    return { error: `Selecciona entre 1 y ${MAX_CONTRACT_EVIDENCE_IMAGES} fotografías válidas.` };
+  }
+  if ((contract.evidenciasFirmadas?.length ?? 0) + evidenceIds.length > MAX_CONTRACT_EVIDENCE_IMAGES) {
+    return { error: `El contrato admite ${MAX_CONTRACT_EVIDENCE_IMAGES} fotografías firmadas en total.` };
+  }
+  const replacementsPending = contract.signedEvidenceReplacementsPending ?? 0;
+  if (replacementsPending > 0 && evidenceIds.length !== replacementsPending) {
+    return { error: `Legal o Administración solicitó reemplazar ${replacementsPending} fotografía${replacementsPending === 1 ? "" : "s"}. Carga esa cantidad para completar la revisión.` };
+  }
+
+  let evidences;
+  try {
+    evidences = await finalizeStagedContractEvidence(session.username, sessionId, id, evidenceIds, { minImages: 1, maxImages: MAX_CONTRACT_EVIDENCE_IMAGES, signed: true });
+    await submitSignedContractEvidence(id, evidences, session.username, session.name);
+  } catch (error) {
+    if (evidences) await Promise.all(evidences.map((evidence) => deleteSignedContractEvidenceFile(id, evidence).catch(() => undefined)));
+    return { error: error instanceof Error ? error.message : "No se pudieron guardar las fotografías firmadas." };
+  }
+  revalidatePath(`/contratos/${id}`);
+  revalidatePath("/contratos");
+  return { ok: "Las fotografías quedaron guardadas y la carga se bloqueó hasta la revisión de Legal o Administración." };
 }
 
 export async function markSignedContractNotificationReadAction(id: string) {

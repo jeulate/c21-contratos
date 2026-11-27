@@ -10,6 +10,8 @@ export type ContractEvidence = {
   mimeType: "image/webp" | "image/jpeg" | "image/png";
   size: number;
   uploadedAt: string;
+  uploadedBy?: string;
+  uploadedByName?: string;
 };
 
 type StagedEvidenceManifest = ContractEvidence;
@@ -207,9 +209,12 @@ export async function finalizeStagedContractEvidence(
   sessionId: string,
   contractId: string,
   evidenceIds: string[],
+  options?: { minImages?: number; maxImages?: number; signed?: boolean },
 ): Promise<ContractEvidence[]> {
-  if (!safeSegment(contractId) || evidenceIds.length < MIN_CONTRACT_EVIDENCE_IMAGES || evidenceIds.length > MAX_CONTRACT_EVIDENCE_IMAGES) {
-    throw new Error(`Adjunta entre ${MIN_CONTRACT_EVIDENCE_IMAGES} y ${MAX_CONTRACT_EVIDENCE_IMAGES} imágenes de respaldo.`);
+  const minImages = options?.minImages ?? MIN_CONTRACT_EVIDENCE_IMAGES;
+  const maxImages = options?.maxImages ?? MAX_CONTRACT_EVIDENCE_IMAGES;
+  if (!safeSegment(contractId) || evidenceIds.length < minImages || evidenceIds.length > maxImages) {
+    throw new Error(`Adjunta entre ${minImages} y ${maxImages} imágenes de respaldo.`);
   }
   if (new Set(evidenceIds).size !== evidenceIds.length || evidenceIds.some((id) => !isEvidenceIdentifier(id))) {
     throw new Error("La lista de imágenes contiene identificadores inválidos.");
@@ -259,7 +264,7 @@ export async function finalizeStagedContractEvidence(
     const uploaded: string[] = [];
     try {
       for (const { manifest, extension, bytes } of manifests) {
-        const key = `${final}/${manifest.id}.${extension}`;
+        const key = `${final}/${manifest.id}${options?.signed ? "-signed" : ""}.${extension}`;
         await bunnyPut(key, bytes!);
         uploaded.push(key);
       }
@@ -277,12 +282,12 @@ export async function finalizeStagedContractEvidence(
 
   const finalDirectory = path.join(evidenceRoot(), "contracts", contractId);
   await mkdir(finalDirectory, { recursive: true, mode: 0o700 });
+  const destinations = manifests.map(({ manifest, extension }) => path.join(finalDirectory, `${manifest.id}${options?.signed ? "-signed" : ""}.${extension}`));
   try {
-    await Promise.all(manifests.map(({ manifest, sourcePath, extension }) =>
-      copyFile(sourcePath!, path.join(finalDirectory, `${manifest.id}.${extension}`))));
+    await Promise.all(manifests.map(({ sourcePath }, index) => copyFile(sourcePath!, destinations[index])));
     await rm(userStagingDirectory(username, sessionId), { recursive: true, force: true });
   } catch (error) {
-    await rm(finalDirectory, { recursive: true, force: true });
+    await Promise.all(destinations.map((filePath) => rm(filePath, { force: true })));
     throw error;
   }
   return manifests.map(({ manifest }) => manifest);
@@ -297,11 +302,35 @@ export async function removeContractEvidenceFiles(contractId: string) {
   await rm(path.join(evidenceRoot(), "contracts", contractId), { recursive: true, force: true });
 }
 
-export async function readContractEvidenceFile(contractId: string, evidence: ContractEvidence) {
+export async function saveSignedContractEvidenceFile(contractId: string, evidence: ContractEvidence, bytes: Buffer) {
   if (!safeSegment(contractId) || !isEvidenceIdentifier(evidence.id) || !supportedMimeTypes.includes(evidence.mimeType)) throw new Error("Identificador de archivo inválido.");
-  const key = `${contractKey(contractId)}/${evidence.id}.${extensionFor(evidence.mimeType)}`;
+  if (bytes.byteLength === 0 || bytes.byteLength > MAX_CONTRACT_EVIDENCE_BYTES || bytes.byteLength !== evidence.size) throw new Error("La imagen supera el tamaño permitido o no coincide con los datos declarados.");
+  const key = `${contractKey(contractId)}/${evidence.id}-signed.${extensionFor(evidence.mimeType)}`;
+  if (storageMode() === "bunny") {
+    await bunnyPut(key, bytes);
+    return;
+  }
+  const directory = path.join(evidenceRoot(), "contracts", contractId);
+  await mkdir(directory, { recursive: true, mode: 0o700 });
+  await writeFile(path.join(directory, `${evidence.id}-signed.${extensionFor(evidence.mimeType)}`), bytes, { flag: "wx", mode: 0o600 });
+}
+
+export async function deleteSignedContractEvidenceFile(contractId: string, evidence: ContractEvidence) {
+  if (!safeSegment(contractId) || !isEvidenceIdentifier(evidence.id) || !supportedMimeTypes.includes(evidence.mimeType)) return;
+  const key = `${contractKey(contractId)}/${evidence.id}-signed.${extensionFor(evidence.mimeType)}`;
+  if (storageMode() === "bunny") {
+    await bunnyDelete(key, true);
+    return;
+  }
+  await rm(path.join(evidenceRoot(), "contracts", contractId, `${evidence.id}-signed.${extensionFor(evidence.mimeType)}`), { force: true });
+}
+
+export async function readContractEvidenceFile(contractId: string, evidence: ContractEvidence, signed = false) {
+  if (!safeSegment(contractId) || !isEvidenceIdentifier(evidence.id) || !supportedMimeTypes.includes(evidence.mimeType)) throw new Error("Identificador de archivo inválido.");
+  const fileName = `${evidence.id}${signed ? "-signed" : ""}.${extensionFor(evidence.mimeType)}`;
+  const key = `${contractKey(contractId)}/${fileName}`;
   if (storageMode() === "bunny") return bunnyRead(key);
-  return readFile(path.join(evidenceRoot(), "contracts", contractId, `${evidence.id}.${extensionFor(evidence.mimeType)}`));
+  return readFile(path.join(evidenceRoot(), "contracts", contractId, fileName));
 }
 
 function advisorPhotoKey(username: string, id: string, mimeType: ContractEvidence["mimeType"]) {

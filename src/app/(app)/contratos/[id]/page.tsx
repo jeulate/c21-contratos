@@ -1,11 +1,12 @@
 import { notFound } from "next/navigation";
 import { requireSession, isStaff } from "@/lib/auth";
-import { allowedContractTransitions, getContract } from "@/lib/contracts";
+import { allowedContractTransitions, getContract, isSignedEvidenceSubmissionLocked } from "@/lib/contracts";
 import { ContractForm } from "@/components/contract-form";
 import { StateBadge } from "@/components/badge";
 import { ContractStatePanel } from "@/components/contract-state-panel";
 import { ContractDocumentPreview } from "@/components/contract-document-preview";
 import { ContractEvidenceGallery } from "@/components/contract-evidence-gallery";
+import { SignedContractEvidenceUploader } from "@/components/signed-contract-evidence-uploader";
 import { ContractDetailsSummary } from "@/components/contract-details-summary";
 import { getContractFormOptions } from "@/lib/contract-form-options";
 import { getCurrencyCatalog } from "@/lib/contract-currencies";
@@ -85,6 +86,8 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
       </div>
       {staff && <ContractEvidenceGallery contractId={c.id} evidencias={c.evidencias ?? []} />}
       {s.role === "asesor" && c.estado === "firmado" && c.evidencias?.length ? <ContractEvidenceGallery contractId={c.id} evidencias={c.evidencias ?? []} /> : null}
+      {c.estado === "firmado" && s.role === "asesor" && <SignedContractEvidenceUploader contractId={c.id} existingCount={c.evidenciasFirmadas?.length ?? 0} locked={isSignedEvidenceSubmissionLocked(c)} replacementCount={c.signedEvidenceStatus === "reupload-requested" ? Math.max(c.signedEvidenceReplacementsPending ?? 1, 1) : 0} />}
+      {c.estado === "firmado" && c.evidenciasFirmadas?.length ? <ContractEvidenceGallery contractId={c.id} evidencias={c.evidenciasFirmadas ?? []} title="Fotografías del contrato firmado" showUploadDetails canRequestReplacement={s.role === "admin" || s.role === "legal"} /> : null}
       {s.role === "asesor" && c.estado !== "anulado" && c.estado !== "firmado" && <ContractForm contract={c} currencyCatalog={currencyCatalog} formOptions={formOptions} canManageState={false} />}
       {s.role === "asesor" && c.estado !== "firmado" && c.templateVersionId && <ContractDocumentPreview contractId={c.id} canDownload={false} />}
       {s.role === "asesor" && !c.templateVersionId && <section className="panel p-5">

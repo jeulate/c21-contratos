@@ -10,6 +10,9 @@ export type Contract = {
   observacion?: string;
   observations?: ContractObservation[];
   evidencias?: ContractEvidence[];
+  evidenciasFirmadas?: ContractEvidence[];
+  signedEvidenceStatus?: "locked" | "reupload-requested";
+  signedEvidenceReplacementsPending?: number;
   asesor: string; // username
   asesorNombre: string;
   asesorProfileSnapshot?: AdvisorProfile;
@@ -50,6 +53,7 @@ export type ContractObservation = {
   at: string;
   resolvedAt?: string;
   resolvedBy?: string;
+  kind?: "signed-evidence";
 };
 
 const ck = (id: string) => `contract:${id}`;
@@ -132,6 +136,71 @@ export async function updateContract(id: string, input: ContractInput, by: strin
   };
   await redis.set(ck(id), next);
   return next;
+}
+
+export function isSignedEvidenceSubmissionLocked(contract: Contract) {
+  if (contract.signedEvidenceStatus === "reupload-requested") return false;
+  if (contract.signedEvidenceStatus === "locked") return true;
+  return (contract.evidenciasFirmadas?.length ?? 0) > 0;
+}
+
+export async function submitSignedContractEvidence(id: string, evidences: ContractEvidence[], by: string, byName: string) {
+  const contract = await getContract(id);
+  if (!contract) throw new Error("Contrato no encontrado.");
+  if (contract.estado !== "firmado") throw new Error("Las fotografías finales solo se pueden adjuntar a contratos firmados.");
+  if (isSignedEvidenceSubmissionLocked(contract)) throw new Error("El respaldo firmado está bloqueado hasta que Legal o Administración solicite un reemplazo.");
+  if (!evidences.length || evidences.length > 20) throw new Error("Guarda entre 1 y 20 fotografías por envío.");
+  const replacementsPending = contract.signedEvidenceReplacementsPending ?? 0;
+  if (replacementsPending > 0 && evidences.length !== replacementsPending) {
+    throw new Error(`Legal o Administración solicitó reemplazar ${replacementsPending} fotografía${replacementsPending === 1 ? "" : "s"}. Carga esa cantidad para completar la revisión.`);
+  }
+  const current = contract.evidenciasFirmadas ?? [];
+  if (current.length + evidences.length > 20) throw new Error("Este contrato solo admite 20 fotografías firmadas en total.");
+  if (new Set(evidences.map((item) => item.id)).size !== evidences.length || evidences.some((evidence) => current.some((item) => item.id === evidence.id))) {
+    throw new Error("Una o más fotografías ya están asociadas al contrato.");
+  }
+
+  const now = new Date().toISOString();
+  const observations = (contract.observations ?? []).map((observation) => observation.kind === "signed-evidence" && !observation.resolvedAt
+    ? { ...observation, resolvedAt: now, resolvedBy: by }
+    : observation);
+  const next: Contract = {
+    ...contract,
+    evidenciasFirmadas: [...current, ...evidences.map((evidence) => ({ ...evidence, uploadedBy: by, uploadedByName: byName }))],
+    signedEvidenceStatus: "locked",
+    signedEvidenceReplacementsPending: 0,
+    observations,
+    updatedAt: now,
+    updatedBy: by,
+    history: [...contract.history, { at: now, by, changes: [`Guardó ${evidences.length} fotografía${evidences.length === 1 ? "" : "s"} del contrato firmado y bloqueó la carga`] }].slice(-50),
+  };
+  await redis.set(ck(id), next);
+  return next;
+}
+
+export async function requestSignedEvidenceReplacement(id: string, evidenceId: string, by: string) {
+  const contract = await getContract(id);
+  if (!contract) throw new Error("Contrato no encontrado.");
+  if (contract.estado !== "firmado") throw new Error("Solo se pueden revisar respaldos de contratos firmados.");
+  const current = contract.evidenciasFirmadas ?? [];
+  const removed = current.find((item) => item.id === evidenceId);
+  if (!removed) throw new Error("La fotografía ya no está asociada al contrato.");
+
+  const now = new Date().toISOString();
+  const message = `Legal o Administración solicita reemplazar la fotografía «${removed.fileName}» del contrato firmado. Se habilitó nuevamente la carga para que adjuntes una imagen legible y guardes el respaldo actualizado.`;
+  const observation: ContractObservation = { id: crypto.randomUUID(), message, by, at: now, kind: "signed-evidence" };
+  const next: Contract = {
+    ...contract,
+    evidenciasFirmadas: current.filter((item) => item.id !== evidenceId),
+    signedEvidenceStatus: "reupload-requested",
+    signedEvidenceReplacementsPending: (contract.signedEvidenceReplacementsPending ?? 0) + 1,
+    observations: [...(contract.observations ?? []), observation],
+    updatedAt: now,
+    updatedBy: by,
+    history: [...contract.history, { at: now, by, changes: [`Solicitó reemplazar fotografía firmada: ${removed.fileName}`] }].slice(-50),
+  };
+  await redis.set(ck(id), next);
+  return { contract: next, removed };
 }
 
 const STATUS_TRANSITIONS: Record<string, string[]> = {
