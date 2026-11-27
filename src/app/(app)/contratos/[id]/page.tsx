@@ -11,6 +11,7 @@ import { getContractFormOptions } from "@/lib/contract-form-options";
 
 export default async function ContratoPage({ params }: { params: Promise<{ id: string }> }) {
   const s = await requireSession();
+  const staff = isStaff(s);
   const { id } = await params;
   const c = await getContract(id);
   if (!c || (!isStaff(s) && c.asesor !== s.username)) notFound();
@@ -44,7 +45,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
         <span className="ml-auto text-sm text-ink-mute dark:text-carbon-400">Asesor: {c.asesorNombre}</span>
       </div>
       <div className="grid gap-5 xl:grid-cols-2">
-        {(s.role === "legal" || s.role === "admin") && <div className="space-y-5">
+        {staff && <div className="space-y-5">
           <ContractStatePanel id={c.id} currentState={c.estado} allowedStates={allowedContractTransitions(c.estado)} />
           {c.templateVersionId && <ContractDocumentPreview contractId={c.id} canDownload />}
           {!c.templateVersionId && <section className="panel p-5">
@@ -66,12 +67,12 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
               <h2 className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">Contrato aprobado por Legal</h2>
               <p className="mt-1 text-sm text-emerald-800 dark:text-emerald-200">El documento está firmado y listo para impresión. Los datos quedaron bloqueados.</p>
             </section>
-            <ContractDetailsSummary contract={c} title="Información aprobada" subtitle="Datos finales del contrato aprobado y firmado por Legal." />
+            <ContractDetailsSummary contract={c} title="Información aprobada" subtitle="Datos finales del contrato aprobado y firmado por Legal." emphasizeInternalData={isStaff(s)} />
           </div>
-        </> : (s.role === "legal" || s.role === "admin") ? <div>
-          <ContractDetailsSummary contract={c} />
+        </> : staff ? <div>
+          <ContractDetailsSummary contract={c} emphasizeInternalData={isStaff(s)} />
         </div> : <>
-          <div><ContractDetailsSummary contract={c} /></div>
+          <div><ContractDetailsSummary contract={c} emphasizeInternalData={isStaff(s)} /></div>
           <div><ContractEvidenceGallery contractId={c.id} evidencias={c.evidencias ?? []} /></div>
         </>}
         {s.role === "asesor" && <div className="xl:col-span-2">
@@ -81,7 +82,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
           </section>}
         </div>}
       </div>
-      {(s.role === "legal" || s.role === "admin") && <ContractEvidenceGallery contractId={c.id} evidencias={c.evidencias ?? []} />}
+      {staff && <ContractEvidenceGallery contractId={c.id} evidencias={c.evidencias ?? []} />}
       {s.role === "asesor" && c.estado === "firmado" && c.evidencias?.length ? <ContractEvidenceGallery contractId={c.id} evidencias={c.evidencias ?? []} /> : null}
       {s.role === "asesor" && c.estado !== "anulado" && c.estado !== "firmado" && <ContractForm contract={c} formOptions={formOptions} canManageState={false} />}
       {s.role === "asesor" && c.estado !== "firmado" && c.templateVersionId && <ContractDocumentPreview contractId={c.id} canDownload={false} />}

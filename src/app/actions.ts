@@ -12,10 +12,11 @@ import { CONTRACT_TYPES, CURRENCIES, isTemplateBasedContract, STATES } from "@/l
 import { changeContractState, ContractInput, createContract, getContract, listContracts, markSignedContractNotificationAsRead, updateContract, validateAdditionalOwners, validateExtras } from "@/lib/contracts";
 import { activateTemplateVersion, createTemplateVersion, deleteTemplateVersion, getActiveTemplate, getTemplateVersion, listTemplateVersions } from "@/lib/contract-templates";
 import { getContractCurrency, setContractCurrency } from "@/lib/contract-currencies";
-import { setContractFormOptions } from "@/lib/contract-form-options";
+import { getContractFormOptions, setContractFormOptions } from "@/lib/contract-form-options";
 import { setContractPrintSettings } from "@/lib/contract-print-settings";
 import { setDashboardExchangeRate } from "@/lib/dashboard-settings";
-import type { CountryCallingCode } from "@/lib/contract-form-option-defaults";
+import { isContractValidityUnit, validityInWords } from "@/lib/contract-validity";
+import type { ContractFormOptions, CountryCallingCode } from "@/lib/contract-form-option-defaults";
 import { validateHtmlTemplateMarkers } from "@/lib/contract-html-document";
 import { finalizeStagedContractEvidence, isEvidenceIdentifier, MIN_CONTRACT_EVIDENCE_IMAGES, MAX_CONTRACT_EVIDENCE_IMAGES, removeContractEvidenceFiles, readAdvisorProfilePhoto } from "@/lib/contract-evidence";
 import PizZip from "pizzip";
@@ -54,6 +55,8 @@ const contractSchema = z.object({
   monto: z.coerce.number().min(0, "El monto no es válido"),
   moneda: z.enum(CURRENCIES),
   fecha: z.string().min(1, "Indica la fecha"),
+  vigenciaCantidad: z.coerce.number().int("La vigencia debe expresarse en números enteros.").min(1, "La vigencia mínima es de una unidad.").max(36_500, "La vigencia supera el límite permitido."),
+  vigenciaUnidad: z.enum(["dias", "meses", "años"]),
   comision: z.coerce.number().min(0).max(100),
   notas: z.string().trim().default(""),
 });
@@ -63,6 +66,11 @@ export async function saveContract(id: string | null, _: FormState, fd: FormData
   if (session.role === "legal") return { error: "El área legal tiene acceso de revisión, no de edición de contratos." };
   const parsed = contractSchema.safeParse(Object.fromEntries(fd));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const currentContract = id ? await getContract(id) : null;
+  const configuredValidityUnits = (await getContractFormOptions()).validityUnits;
+  if (!configuredValidityUnits.includes(parsed.data.vigenciaUnidad) && currentContract?.vigenciaUnidad !== parsed.data.vigenciaUnidad) {
+    return { error: "Esta unidad de vigencia está deshabilitada. Selecciona una opción habilitada." };
+  }
   if (isTemplateBasedContract(parsed.data.tipo) && !/^[\p{L}\p{M}][\p{L}\p{M}\s.'’\-]*$/u.test(parsed.data.cliente)) {
     return { error: "El nombre del propietario solo debe contener texto, espacios, apóstrofes, puntos o guiones." };
   }
@@ -99,9 +107,9 @@ export async function saveContract(id: string | null, _: FormState, fd: FormData
     templateVersionId = activeTemplate.id;
   }
 
-  const input: ContractInput = { ...parsed.data, extras, additionalOwners: isTemplateBasedContract(parsed.data.tipo) ? validatedAdditionalOwners.owners ?? [] : [] };
+  const input: ContractInput = { ...parsed.data, vigenciaEnPalabras: validityInWords(parsed.data.vigenciaCantidad, parsed.data.vigenciaUnidad), extras, additionalOwners: isTemplateBasedContract(parsed.data.tipo) ? validatedAdditionalOwners.owners ?? [] : [] };
   if (id) {
-    const current = await getContract(id);
+    const current = currentContract;
     if (!current || (!isStaff(session) && current.asesor !== session.username)) return { error: "Sin permiso" };
     if (current.estado === "anulado") return { error: "Este contrato fue anulado y ya no se puede editar." };
     if (session.role === "asesor" && current.estado === "firmado") return { error: "Este contrato ya fue aprobado y firmado por Legal; no se puede modificar." };
@@ -255,7 +263,10 @@ export async function saveContractFormOptionsAction(_: FormState, fd: FormData):
     const propertyTypes = parseFormOptionList(String(fd.get("propertyTypes") ?? ""), "Tipos de inmueble");
     const identityCities = parseFormOptionList(String(fd.get("identityCities") ?? ""), "Ciudades de expedición");
     const countryCallingCodes = parseCountryCallingCodes(String(fd.get("countryCallingCodes") ?? ""));
-    await setContractFormOptions({ propertyTypes, identityCities, countryCallingCodes });
+    const validityUnits = [...new Set(fd.getAll("validityUnits").map(String))];
+    if (!validityUnits.length) throw new Error("Deja al menos una unidad de vigencia habilitada.");
+    if (validityUnits.some((unit) => !isContractValidityUnit(unit))) throw new Error("Selecciona unidades de vigencia válidas.");
+    await setContractFormOptions({ propertyTypes, identityCities, countryCallingCodes, validityUnits: validityUnits as ContractFormOptions["validityUnits"] });
     revalidatePath("/configuracion-contratos");
     revalidatePath("/contratos/nuevo");
     revalidatePath("/contratos/[id]", "page");
@@ -407,7 +418,7 @@ export async function uploadContractTemplateAction(_: FormState, fd: FormData): 
       "property.landArea", "property.builtArea", "property.bedroomCount", "property.suiteCount", "property.otherDetails", "property.liens",
       "advisor.fullName", "advisor.identityNumber", "advisor.identityIssuedIn", "advisor.address", "advisor.mobile", "advisor.whatsapp", "advisor.email",
       "contract.id", "contract.type", "contract.amount", "contract.amountNumeric", "contract.amountInWords", "contract.amountPerHectare",
-      "contract.currency", "contract.currencyName", "contract.currencySymbol", "contract.date", "contract.dateRaw", "contract.commission", "contract.status", "client.name", "client.document",
+      "contract.currency", "contract.currencyName", "contract.currencySymbol", "contract.date", "contract.dateRaw", "contract.validityNumeric", "contract.validityUnit", "contract.validityInWords", "contract.expirationDate", "contract.commission", "contract.status", "client.name", "client.document",
       "propertyName", "amount", "currency", "currencyName", "currencySymbol", "date",
       ...typeDefinition.extras.map((field) => `extras.${field.key}`),
     ]);
@@ -469,7 +480,7 @@ export async function saveHtmlContractTemplateAction(_: FormState, fd: FormData)
     "property.landArea", "property.builtArea", "property.bedroomCount", "property.suiteCount", "property.otherDetails", "property.liens",
     "advisor.fullName", "advisor.identityNumber", "advisor.identityIssuedIn", "advisor.address", "advisor.mobile", "advisor.whatsapp", "advisor.email",
     "contract.id", "contract.type", "contract.amount", "contract.amountNumeric", "contract.amountInWords", "contract.amountPerHectare",
-    "contract.currency", "contract.currencyName", "contract.currencySymbol", "contract.date", "contract.dateRaw", "contract.commission", "contract.status",
+    "contract.currency", "contract.currencyName", "contract.currencySymbol", "contract.date", "contract.dateRaw", "contract.validityNumeric", "contract.validityUnit", "contract.validityInWords", "contract.expirationDate", "contract.commission", "contract.status",
     "client.name", "client.document", "propertyName", "amount", "currency", "currencyName", "currencySymbol", "date",
     ...typeDefinition.extras.map((field) => `extras.${field.key}`),
   ]);

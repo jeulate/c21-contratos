@@ -101,7 +101,7 @@ export function ContractTemplateHtmlEditor({ version }: { version: ContractTempl
 
   const markerGroups = [
     { title: "Propietarios", tags: ["{{owner1.fullName}}", "{{owner1.identityNumber}}", "{{owner1.identityIssuedIn}}", "{{owner1.address}}", "{{owner1.whatsapp}}", "{{#owners}}…{{/owners}}", "{{separator}}"] },
-    { title: "Inmueble y contrato", tags: ["{{property.address}}", "{{property.registry}}", "{{contract.amount}}", "{{contract.amountInWords}}", "{{contract.currency}}", "{{contract.date}}"] },
+    { title: "Inmueble y contrato", tags: ["{{property.address}}", "{{property.registry}}", "{{contract.amount}}", "{{contract.amountInWords}}", "{{contract.currency}}", "{{contract.date}}", "{{contract.validityNumeric}}", "{{contract.validityUnit}}", "{{contract.validityInWords}}", "{{contract.expirationDate}}"] },
     { title: "Asesor", tags: ["{{advisor.fullName}}", "{{advisor.mobile}}", "{{advisor.email}}"] },
   ];
 
